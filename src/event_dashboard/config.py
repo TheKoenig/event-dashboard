@@ -8,6 +8,7 @@ import os
 import pathlib
 import tempfile
 import threading
+import typing
 import uuid
 
 import pydantic
@@ -18,6 +19,8 @@ DEFAULT_RANGE_MINUTES = 120
 MAX_RANGE_MINUTES = 7 * 24 * 60
 ALLOWED_SCHEMES = ("http://", "https://", "webcal://", "webcals://")
 DEFAULT_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b")
+DEFAULT_TITLE = "Upcoming events"
+Theme = typing.Literal["auto", "light", "dark"]
 
 
 class CalendarConfig(pydantic.BaseModel):
@@ -61,12 +64,21 @@ class AppConfig(pydantic.BaseModel):
     """Top-level application configuration.
 
     Attributes:
+        title: Page title shown in the header and browser tab.
+        theme: Color theme; ``auto`` follows the operating system preference.
         range_minutes: Look-ahead window for upcoming events in minutes.
         calendars: List of subscribed calendars.
     """
 
+    title: str = pydantic.Field(default=DEFAULT_TITLE, max_length=100)
+    theme: Theme = "auto"
     range_minutes: int = pydantic.Field(default=DEFAULT_RANGE_MINUTES, ge=1, le=MAX_RANGE_MINUTES)
     calendars: list[CalendarConfig] = pydantic.Field(default_factory=list)
+
+    @pydantic.field_validator("title")
+    @classmethod
+    def _default_title(cls, value: str) -> str:
+        return value.strip() or DEFAULT_TITLE
 
     @pydantic.model_validator(mode="after")
     def _unique_ids(self) -> AppConfig:

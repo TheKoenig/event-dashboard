@@ -37,8 +37,15 @@ def test_index_and_static(client: fastapi.testclient.TestClient) -> None:
 
 
 def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
-    assert client.get("/api/config").json() == {"range_minutes": 120, "calendars": []}
+    assert client.get("/api/config").json() == {
+        "title": "Upcoming events",
+        "theme": "auto",
+        "range_minutes": 120,
+        "calendars": [],
+    }
     body = {
+        "title": "Team Board",
+        "theme": "dark",
         "range_minutes": 30,
         "calendars": [{"name": "Work", "url": "https://example.com/a.ics", "color": "#123456"}],
     }
@@ -46,12 +53,22 @@ def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
     assert resp.status_code == 200
     saved = resp.json()
     assert saved["range_minutes"] == 30
+    assert saved["title"] == "Team Board"
+    assert saved["theme"] == "dark"
     assert saved["calendars"][0]["id"]
     assert client.get("/api/config").json() == saved
 
 
-def test_config_validation(client: fastapi.testclient.TestClient) -> None:
-    resp = client.put("/api/config", json={"range_minutes": 0, "calendars": []})
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"range_minutes": 0, "calendars": []},
+        {"theme": "purple"},
+        {"title": "x" * 101},
+    ],
+)
+def test_config_validation(client: fastapi.testclient.TestClient, body: dict) -> None:
+    resp = client.put("/api/config", json=body)
     assert resp.status_code == 422
 
 
@@ -59,6 +76,8 @@ def test_events_empty(client: fastapi.testclient.TestClient) -> None:
     data = client.get("/api/events").json()
     assert data["calendars"] == []
     assert data["range_minutes"] == 120
+    assert data["title"] == "Upcoming events"
+    assert data["theme"] == "auto"
 
 
 @respx.mock

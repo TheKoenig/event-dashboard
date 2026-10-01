@@ -75,7 +75,13 @@ def create_app(
                 calendars = list(
                     pool.map(lambda c: _calendar_payload(c, fetcher, now, window), cfg.calendars)
                 )
-        return {"now": now.isoformat(), "range_minutes": cfg.range_minutes, "calendars": calendars}
+        return {
+            "now": now.isoformat(),
+            "title": cfg.title,
+            "theme": cfg.theme,
+            "range_minutes": cfg.range_minutes,
+            "calendars": calendars,
+        }
 
     @app.get("/", include_in_schema=False)
     def index() -> fastapi.responses.FileResponse:

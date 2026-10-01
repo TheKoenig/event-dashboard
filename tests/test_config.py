@@ -15,6 +15,8 @@ def test_default_config_created(tmp_path: pathlib.Path) -> None:
     assert path.exists()
     assert store.get().range_minutes == config.DEFAULT_RANGE_MINUTES
     assert store.get().calendars == []
+    assert store.get().title == config.DEFAULT_TITLE
+    assert store.get().theme == "auto"
 
 
 def test_update_persists(tmp_path: pathlib.Path) -> None:
@@ -66,3 +68,25 @@ def test_duplicate_ids_rejected() -> None:
 
 def test_blank_id_regenerated() -> None:
     assert config.CalendarConfig(id=" ", name="A", url="https://x").id
+
+
+def test_blank_title_uses_default() -> None:
+    assert config.AppConfig(title="   ").title == config.DEFAULT_TITLE
+
+
+def test_title_trimmed() -> None:
+    assert config.AppConfig(title="  My Board ").title == "My Board"
+
+
+def test_old_config_without_new_fields_loads(tmp_path: pathlib.Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"range_minutes": 45, "calendars": []}))
+    cfg = config.ConfigStore(path).get()
+    assert cfg.range_minutes == 45
+    assert cfg.title == config.DEFAULT_TITLE
+    assert cfg.theme == "auto"
+
+
+def test_invalid_theme() -> None:
+    with pytest.raises(pydantic.ValidationError):
+        config.AppConfig(theme="blue")

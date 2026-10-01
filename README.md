@@ -14,6 +14,8 @@ uv run event-dashboard serve
 
 Open <http://127.0.0.1:8000>, then click **⚙** to open the settings panel, where you can:
 
+- set the page title (shown in the header and browser tab)
+- pick a theme: **Auto** (follows the OS light/dark setting), **Light** or **Dark**
 - set the time range in minutes (1–10080)
 - add or remove calendars (name, ICS/webcal URL, color)
 

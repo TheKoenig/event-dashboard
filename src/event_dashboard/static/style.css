@@ -4,13 +4,44 @@
   --text: #1d2330;
   --muted: #6b7280;
   --track: #e5e7eb;
+  --input-bg: #ffffff;
+  --border: #d1d5db;
+  --error: #b91c1c;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #111827;
+  --card: #1f2937;
+  --text: #f3f4f6;
+  --muted: #9ca3af;
+  --track: #374151;
+  --input-bg: #111827;
+  --border: #4b5563;
+  --error: #f87171;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-theme="auto"] {
+    --bg: #111827;
+    --card: #1f2937;
+    --text: #f3f4f6;
+    --muted: #9ca3af;
+    --track: #374151;
+    --input-bg: #111827;
+    --border: #4b5563;
+    --error: #f87171;
+    color-scheme: dark;
+  }
 }
 * { box-sizing: border-box; }
 body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+input, select, button { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
+#settings label { display: block; margin-bottom: .75rem; }
+#settings label input:not([type="color"]), #settings label select { display: block; margin-top: .25rem; padding: .4rem; min-width: 16rem; }
 header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 header h1 { margin: 0; font-size: 1.4rem; }
 header small { color: var(--muted); font-weight: normal; font-size: .9rem; }
-#settings-toggle { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
+#settings-toggle { font-size: 1.5rem; background: none; border: none; cursor: pointer; color: var(--text); }
 main, #settings { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 #settings { background: var(--card); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 .calendar-row { display: grid; grid-template-columns: 1fr 2fr auto auto; gap: .5rem; margin-bottom: .5rem; }
@@ -27,5 +58,5 @@ button { padding: .4rem .9rem; cursor: pointer; }
 .bar { height: 14px; background: var(--track); border-radius: 7px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--cal-color); transition: width 1s linear; }
 .muted { color: var(--muted); }
-.error { color: #b91c1c; }
-#settings-message.error { color: #b91c1c; }
+.error { color: var(--error); }
+#settings-message.error { color: var(--error); }

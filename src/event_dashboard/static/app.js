@@ -4,9 +4,15 @@ const TICK_MS = 5000;
 const POLL_MS = 60000;
 const DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"];
 
-let state = { rangeMinutes: 120, calendars: [] };
+let state = { title: "Upcoming events", theme: "auto", rangeMinutes: 120, calendars: [] };
 
 const $ = (sel) => document.querySelector(sel);
+
+function applyAppearance(title, theme) {
+  $("#page-title").textContent = title;
+  document.title = title;
+  document.documentElement.dataset.theme = ["light", "dark"].includes(theme) ? theme : "auto";
+}
 
 function el(tag, attrs = {}, text) {
   const node = document.createElement(tag);
@@ -33,6 +39,7 @@ function formatCountdown(ms) {
 function render() {
   const main = $("#dashboard");
   main.replaceChildren();
+  applyAppearance(state.title, state.theme);
   $("#range-label").textContent = `(next ${state.rangeMinutes} min)`;
   if (!state.calendars.length) {
     main.append(el("p", { class: "muted" }, "No calendars configured. Click ⚙ to add one."));
@@ -80,7 +87,12 @@ async function loadEvents() {
     const resp = await fetch("/api/events");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    state = { rangeMinutes: data.range_minutes, calendars: data.calendars };
+    state = {
+      title: data.title,
+      theme: data.theme,
+      rangeMinutes: data.range_minutes,
+      calendars: data.calendars,
+    };
     render();
   } catch (err) {
     $("#dashboard").replaceChildren(el("p", { class: "error" }, `Could not load events: ${err.message}`));
@@ -108,6 +120,8 @@ async function openSettings() {
     const resp = await fetch("/api/config");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const cfg = await resp.json();
+    $("#title-input").value = cfg.title;
+    $("#theme-input").value = cfg.theme;
     $("#range-input").value = cfg.range_minutes;
     $("#calendar-list").replaceChildren();
     cfg.calendars.forEach(addCalendarRow);
@@ -140,7 +154,12 @@ async function saveSettings(event) {
     if (row.dataset.id) cal.id = row.dataset.id;
     return cal;
   });
-  const body = { range_minutes: parseInt($("#range-input").value, 10), calendars };
+  const body = {
+    title: $("#title-input").value.trim(),
+    theme: $("#theme-input").value,
+    range_minutes: parseInt($("#range-input").value, 10),
+    calendars,
+  };
   try {
     const resp = await fetch("/api/config", {
       method: "PUT",
@@ -163,7 +182,11 @@ $("#settings-toggle").addEventListener("click", () => {
   if ($("#settings").hidden) openSettings();
   else setSettingsVisible(false);
 });
-$("#cancel-settings").addEventListener("click", () => setSettingsVisible(false));
+$("#theme-input").addEventListener("change", (e) => applyAppearance(state.title, e.target.value));
+$("#cancel-settings").addEventListener("click", () => {
+  applyAppearance(state.title, state.theme);
+  setSettingsVisible(false);
+});
 $("#add-calendar").addEventListener("click", () => addCalendarRow());
 $("#settings-form").addEventListener("submit", saveSettings);
 

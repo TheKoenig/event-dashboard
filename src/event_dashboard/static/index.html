@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="auto">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -8,13 +8,23 @@
 </head>
 <body>
   <header>
-    <h1>Upcoming events <small id="range-label"></small></h1>
+    <h1><span id="page-title">Upcoming events</span> <small id="range-label"></small></h1>
     <button id="settings-toggle" type="button" title="Settings" aria-expanded="false" aria-controls="settings">⚙</button>
   </header>
 
   <section id="settings" hidden>
     <h2>Settings</h2>
     <form id="settings-form">
+      <label>Page title
+        <input id="title-input" type="text" maxlength="100" placeholder="Upcoming events">
+      </label>
+      <label>Theme
+        <select id="theme-input">
+          <option value="auto">Auto (system)</option>
+          <option value="light">Light</option>
+          <option value="dark">Dark</option>
+        </select>
+      </label>
       <label>Time range (minutes)
         <input id="range-input" type="number" min="1" max="10080" required>
       </label>
