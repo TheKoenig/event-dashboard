@@ -73,8 +73,9 @@ def upcoming_events(
     now: datetime.datetime,
     window: datetime.timedelta,
     local_tz: datetime.tzinfo | None = None,
+    keep: datetime.timedelta = datetime.timedelta(0),
 ) -> list[Event]:
-    """Return events starting within ``[now, now + window]``, sorted by start.
+    """Return events starting within ``[now - keep, now + window]``, sorted by start.
 
     Recurring events are expanded. Floating and all-day times are interpreted in ``local_tz``.
 
@@ -83,6 +84,7 @@ def upcoming_events(
         now: Current timezone-aware time.
         window: Look-ahead window.
         local_tz: Timezone for floating/all-day times (defaults to system local timezone).
+        keep: How long already started events are still returned.
 
     Returns:
         Sorted list of upcoming events.
@@ -97,11 +99,11 @@ def upcoming_events(
         calendar = icalendar.Calendar.from_ical(ics)
     except (ValueError, IndexError, KeyError) as exc:
         raise ParseError(f"Invalid ICS data: {exc}") from exc
-    end = now + window
+    begin, end = now - keep, now + window
     # Query with a margin so floating/all-day events in other offsets are not missed.
     margin = datetime.timedelta(days=1)
     try:
-        components = recurring_ical_events.of(calendar).between(now - margin, end + margin)
+        components = recurring_ical_events.of(calendar).between(begin - margin, end + margin)
     except Exception as exc:  # library raises a variety of errors on broken data
         raise ParseError(f"Could not expand events: {exc}") from exc
 
@@ -124,7 +126,7 @@ def upcoming_events(
             finish = start + component.get("DURATION").dt
         else:
             finish = start + (datetime.timedelta(days=1) if all_day else datetime.timedelta(0))
-        if not now <= start <= end:
+        if not begin <= start <= end:
             continue
         title = str(component.get("SUMMARY", "")).strip() or "(no title)"
         events.append(Event(title=title, start=start, end=finish, all_day=all_day))

@@ -24,6 +24,7 @@ def _calendar_payload(
     now: datetime.datetime,
     window: datetime.timedelta,
     force: bool = False,
+    keep: datetime.timedelta = datetime.timedelta(0),
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": cal.id,
@@ -34,11 +35,24 @@ def _calendar_payload(
     }
     try:
         data = fetcher.fetch(cal.url, force=force)
-        payload["events"] = [ev.to_dict() for ev in events.upcoming_events(data, now, window)]
+        payload["events"] = [
+            ev.to_dict() for ev in events.upcoming_events(data, now, window, keep=keep)
+        ]
     except (calendar_fetch.FetchError, events.ParseError) as exc:
         logger.warning("Calendar %r failed: %s", cal.name, exc)
         payload["error"] = str(exc)
     return payload
+
+
+def _display_settings(cfg: config.AppConfig) -> dict[str, object]:
+    """Return the progress-bar display settings sent with every events response."""
+    return {
+        "started_keep_minutes": cfg.started_keep_minutes,
+        "warn_minutes": cfg.warn_minutes,
+        "warn_color": cfg.warn_color,
+        "alert_minutes": cfg.alert_minutes,
+        "alert_color": cfg.alert_color,
+    }
 
 
 def create_app(
@@ -84,6 +98,7 @@ def create_app(
         cfg = store.get()
         now = datetime.datetime.now(datetime.timezone.utc)
         window = datetime.timedelta(minutes=cfg.range_minutes)
+        keep = datetime.timedelta(minutes=cfg.started_keep_minutes)
         calendars: list[dict[str, object]] = []
         if refresh:
             logger.info(
@@ -94,7 +109,9 @@ def create_app(
             with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
                 calendars = list(
                     pool.map(
-                        lambda c: _calendar_payload(c, fetcher, now, window, force=refresh),
+                        lambda c: _calendar_payload(
+                            c, fetcher, now, window, force=refresh, keep=keep
+                        ),
                         cfg.calendars,
                     )
                 )
@@ -104,6 +121,7 @@ def create_app(
             "theme": cfg.theme,
             "language": cfg.language,
             "range_minutes": cfg.range_minutes,
+            **_display_settings(cfg),
             "calendars": calendars,
         }
 
@@ -117,10 +135,12 @@ def create_app(
             logger.info("Manual refresh requested for calendar %r", cal.name)
         now = datetime.datetime.now(datetime.timezone.utc)
         window = datetime.timedelta(minutes=cfg.range_minutes)
+        keep = datetime.timedelta(minutes=cfg.started_keep_minutes)
         return {
             "now": now.isoformat(),
             "range_minutes": cfg.range_minutes,
-            "calendar": _calendar_payload(cal, fetcher, now, window, force=refresh),
+            **_display_settings(cfg),
+            "calendar": _calendar_payload(cal, fetcher, now, window, force=refresh, keep=keep),
         }
 
     @app.get("/favicon.ico", include_in_schema=False)

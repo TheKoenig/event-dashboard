@@ -22,6 +22,13 @@ MAX_RANGE_MINUTES = 7 * 24 * 60
 ALLOWED_SCHEMES = ("http://", "https://", "webcal://", "webcals://")
 DEFAULT_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b")
 DEFAULT_TITLE = "Upcoming events"
+DEFAULT_STARTED_KEEP_MINUTES = 5
+MAX_STARTED_KEEP_MINUTES = 24 * 60
+DEFAULT_WARN_MINUTES = 15
+DEFAULT_WARN_COLOR = "#ff8c00"
+DEFAULT_ALERT_MINUTES = 3
+DEFAULT_ALERT_COLOR = "#e53935"
+_COLOR_PATTERN = r"^#[0-9a-fA-F]{6}$"
 AUTO_LANGUAGE = "auto"
 Theme = typing.Literal["auto", "light", "dark"]
 _LANGUAGE_PATTERN = r"^(auto|[a-z]{2,3}(-[a-z0-9]{2,8})?)$"
@@ -54,7 +61,7 @@ class CalendarConfig(pydantic.BaseModel):
     id: str = pydantic.Field(default_factory=lambda: uuid.uuid4().hex[:12])
     name: str = pydantic.Field(min_length=1, max_length=100)
     url: str = pydantic.Field(min_length=1, max_length=2048)
-    color: str = pydantic.Field(default=DEFAULT_COLORS[0], pattern=r"^#[0-9a-fA-F]{6}$")
+    color: str = pydantic.Field(default=DEFAULT_COLORS[0], pattern=_COLOR_PATTERN)
 
     @pydantic.field_validator("name", "url")
     @classmethod
@@ -86,6 +93,13 @@ class AppConfig(pydantic.BaseModel):
         theme: Color theme; ``auto`` follows the operating system preference.
         language: UI language code; ``auto`` uses the browser language.
         range_minutes: Look-ahead window for upcoming events in minutes.
+        started_keep_minutes: How long a started event stays visible (full grey bar); 0 hides it
+            immediately.
+        warn_minutes: Bars switch to ``warn_color`` this many minutes before the start; 0 disables.
+        warn_color: Hex color for approaching events.
+        alert_minutes: Bars switch to ``alert_color`` and blink this many minutes before the
+            start; 0 disables. Must not exceed ``warn_minutes`` unless that is 0.
+        alert_color: Hex color for imminent events.
         calendars: List of subscribed calendars.
     """
 
@@ -93,6 +107,13 @@ class AppConfig(pydantic.BaseModel):
     theme: Theme = "auto"
     language: str = pydantic.Field(default=AUTO_LANGUAGE, pattern=_LANGUAGE_PATTERN)
     range_minutes: int = pydantic.Field(default=DEFAULT_RANGE_MINUTES, ge=1, le=MAX_RANGE_MINUTES)
+    started_keep_minutes: int = pydantic.Field(
+        default=DEFAULT_STARTED_KEEP_MINUTES, ge=0, le=MAX_STARTED_KEEP_MINUTES
+    )
+    warn_minutes: int = pydantic.Field(default=DEFAULT_WARN_MINUTES, ge=0, le=MAX_RANGE_MINUTES)
+    warn_color: str = pydantic.Field(default=DEFAULT_WARN_COLOR, pattern=_COLOR_PATTERN)
+    alert_minutes: int = pydantic.Field(default=DEFAULT_ALERT_MINUTES, ge=0, le=MAX_RANGE_MINUTES)
+    alert_color: str = pydantic.Field(default=DEFAULT_ALERT_COLOR, pattern=_COLOR_PATTERN)
     calendars: list[CalendarConfig] = pydantic.Field(default_factory=list)
 
     @pydantic.field_validator("title")
@@ -104,6 +125,12 @@ class AppConfig(pydantic.BaseModel):
     @classmethod
     def _normalize_language(cls, value: object) -> object:
         return value.strip().lower() if isinstance(value, str) else value
+
+    @pydantic.model_validator(mode="after")
+    def _alert_within_warn(self) -> AppConfig:
+        if self.warn_minutes and self.alert_minutes > self.warn_minutes:
+            raise ValueError("alert_minutes must not be greater than warn_minutes")
+        return self
 
     @pydantic.model_validator(mode="after")
     def _unique_ids(self) -> AppConfig:

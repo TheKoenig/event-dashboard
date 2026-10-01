@@ -7,7 +7,18 @@ const DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "
 // Must match config.DEFAULT_TITLE on the server; shown translated in the UI.
 const SERVER_DEFAULT_TITLE = "Upcoming events";
 
-let state = { title: "", theme: "auto", language: "auto", rangeMinutes: 120, calendars: [] };
+let state = {
+  title: "",
+  theme: "auto",
+  language: "auto",
+  rangeMinutes: 120,
+  startedKeepMinutes: 5,
+  warnMinutes: 15,
+  warnColor: "#ff8c00",
+  alertMinutes: 3,
+  alertColor: "#e53935",
+  calendars: [],
+};
 let lastUpdated = null;
 
 const $ = (sel) => document.querySelector(sel);
@@ -44,8 +55,12 @@ function formatDuration(minutes) {
   return m ? t("durationHoursMinutes", { h, m }) : t("durationHours", { h });
 }
 
+function formatStarted(ms) {
+  const minutes = Math.floor(ms / 60000);
+  return minutes < 1 ? t("startedJustNow") : t("startedAgo", { duration: formatDuration(minutes) });
+}
+
 function formatCountdown(ms) {
-  if (ms <= 0) return t("startingNow");
   const totalMin = Math.ceil(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
@@ -85,7 +100,7 @@ function renderCalendar(cal) {
   header.append(el("h2", {}, cal.name), button);
   section.append(header);
   if (cal.error) section.append(el("p", { class: "error" }, t("error", { message: cal.error })));
-  else if (!cal.events.length) section.append(el("p", { class: "muted" }, t("noEvents")));
+  else section.append(el("p", { class: "muted no-events" }, t("noEvents")));
   for (const ev of cal.events) {
     const row = el("div", { class: "event" });
     const head = el("div", { class: "event-head" });
@@ -117,6 +132,7 @@ async function refreshCalendar(id, button) {
       await loadEvents(); // config changed meanwhile; reload everything
       return;
     }
+    Object.assign(state, displaySettings(data));
     state.calendars[index] = cal;
     section.replaceWith(renderCalendar(cal));
     tick();
@@ -128,16 +144,39 @@ async function refreshCalendar(id, button) {
   }
 }
 
+// Bar color for an upcoming event: alert (blinking) < warn < calendar color.
+function phaseFor(remaining) {
+  if (state.alertMinutes && remaining <= state.alertMinutes * 60000) return "alert";
+  if (state.warnMinutes && remaining <= state.warnMinutes * 60000) return "warn";
+  return "normal";
+}
+
 function tick() {
   const now = Date.now();
   const windowMs = state.rangeMinutes * 60000;
+  const keepMs = state.startedKeepMinutes * 60000;
   document.querySelectorAll(".event").forEach((row) => {
     const ev = row._ev;
     const remaining = ev.start.getTime() - now;
-    const pct = Math.max(0, Math.min(100, (1 - remaining / windowMs) * 100));
+    const started = remaining <= 0;
+    // Started events stay as a full grey bar until the keep time is over.
+    row.hidden = started && -remaining >= keepMs;
+    const phase = started ? "started" : phaseFor(remaining);
+    row.classList.toggle("started", phase === "started");
+    row.classList.toggle("warn", phase === "warn");
+    row.classList.toggle("alert", phase === "alert");
+    const color = { warn: state.warnColor, alert: state.alertColor }[phase];
+    if (color) row.style.setProperty("--bar-color", color);
+    else row.style.removeProperty("--bar-color");
+    const pct = started ? 100 : Math.max(0, Math.min(100, (1 - remaining / windowMs) * 100));
     ev.fill.style.width = pct.toFixed(1) + "%";
     ev.bar.setAttribute("aria-valuenow", pct.toFixed(0));
-    ev.time.textContent = `${formatStart(ev.start, ev.allDay)} · ${formatCountdown(remaining)}`;
+    const status = started ? formatStarted(-remaining) : formatCountdown(remaining);
+    ev.time.textContent = `${formatStart(ev.start, ev.allDay)} · ${status}`;
+  });
+  document.querySelectorAll("#dashboard .calendar").forEach((section) => {
+    const placeholder = section.querySelector(".no-events");
+    if (placeholder) placeholder.hidden = !!section.querySelector(".event:not([hidden])");
   });
 }
 
@@ -148,6 +187,16 @@ function updateRefreshTooltip() {
     text += "\n" + t("lastUpdated", { time: formatTime(lastUpdated) });
   }
   button.title = text;
+}
+
+function displaySettings(data) {
+  return {
+    startedKeepMinutes: data.started_keep_minutes ?? 5,
+    warnMinutes: data.warn_minutes ?? 15,
+    warnColor: data.warn_color || "#ff8c00",
+    alertMinutes: data.alert_minutes ?? 3,
+    alertColor: data.alert_color || "#e53935",
+  };
 }
 
 async function loadEvents(refresh = false) {
@@ -161,6 +210,7 @@ async function loadEvents(refresh = false) {
       theme: data.theme,
       language: data.language || "auto",
       rangeMinutes: data.range_minutes,
+      ...displaySettings(data),
       calendars: data.calendars.map((cal) => ({ ...cal, updated })),
     };
     // Don't switch the UI language under an open settings panel (it may be previewing another one).
@@ -222,6 +272,11 @@ async function openSettings() {
     $("#title-input").value = isDefaultTitle(cfg.title) ? "" : cfg.title;
     $("#theme-input").value = cfg.theme;
     $("#range-input").value = cfg.range_minutes;
+    $("#started-keep-input").value = cfg.started_keep_minutes;
+    $("#warn-minutes-input").value = cfg.warn_minutes;
+    $("#warn-color-input").value = cfg.warn_color;
+    $("#alert-minutes-input").value = cfg.alert_minutes;
+    $("#alert-color-input").value = cfg.alert_color;
     $("#calendar-list").replaceChildren();
     cfg.calendars.forEach(addCalendarRow);
   } catch (err) {
@@ -238,7 +293,12 @@ function setSettingsVisible(visible) {
 
 function formatValidationError(detail) {
   if (!Array.isArray(detail)) return String(detail);
-  return detail.map((d) => `${(d.loc || []).slice(1).join(".")}: ${d.msg}`).join("; ");
+  return detail
+    .map((d) => {
+      const field = (d.loc || []).slice(1).join(".");
+      return field ? `${field}: ${d.msg}` : d.msg;
+    })
+    .join("; ");
 }
 
 async function saveSettings(event) {
@@ -258,6 +318,11 @@ async function saveSettings(event) {
     theme: $("#theme-input").value,
     language: $("#language-input").value,
     range_minutes: parseInt($("#range-input").value, 10),
+    started_keep_minutes: parseInt($("#started-keep-input").value, 10),
+    warn_minutes: parseInt($("#warn-minutes-input").value, 10),
+    warn_color: $("#warn-color-input").value,
+    alert_minutes: parseInt($("#alert-minutes-input").value, 10),
+    alert_color: $("#alert-color-input").value,
     calendars,
   };
   try {

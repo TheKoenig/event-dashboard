@@ -37,6 +37,26 @@
       <label><span data-i18n="timeRange">Time range (minutes)</span>
         <input id="range-input" type="number" min="1" max="10080" required>
       </label>
+      <h3 data-i18n="progressBars">Progress bars</h3>
+      <label><span data-i18n="startedKeep">Keep started events (minutes)</span>
+        <input id="started-keep-input" type="number" min="0" max="1440" required>
+      </label>
+      <div class="threshold-row">
+        <label><span data-i18n="warnMinutes">Warning before start (minutes, 0 = off)</span>
+          <input id="warn-minutes-input" type="number" min="0" max="10080" required>
+        </label>
+        <label class="color-label"><span data-i18n="color">Color</span>
+          <input id="warn-color-input" type="color">
+        </label>
+      </div>
+      <div class="threshold-row">
+        <label><span data-i18n="alertMinutes">Alert before start, blinking (minutes, 0 = off)</span>
+          <input id="alert-minutes-input" type="number" min="0" max="10080" required>
+        </label>
+        <label class="color-label"><span data-i18n="color">Color</span>
+          <input id="alert-color-input" type="color">
+        </label>
+      </div>
       <h3 data-i18n="calendars">Calendars</h3>
       <div id="calendar-list"></div>
       <button type="button" id="add-calendar" data-i18n="addCalendar">+ Add calendar</button>

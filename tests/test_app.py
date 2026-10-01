@@ -49,6 +49,11 @@ def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
         "theme": "auto",
         "language": "auto",
         "range_minutes": 120,
+        "started_keep_minutes": 5,
+        "warn_minutes": 15,
+        "warn_color": "#ff8c00",
+        "alert_minutes": 3,
+        "alert_color": "#e53935",
         "calendars": [],
     }
     body = {
@@ -77,6 +82,11 @@ def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
         {"title": "x" * 101},
         {"language": "xx"},
         {"language": "../etc/passwd"},
+        {"started_keep_minutes": -1},
+        {"started_keep_minutes": 1441},
+        {"warn_color": "orange"},
+        {"alert_color": "#12345"},
+        {"warn_minutes": 5, "alert_minutes": 10},
     ],
 )
 def test_config_validation(client: fastapi.testclient.TestClient, body: dict) -> None:
@@ -91,6 +101,14 @@ def test_events_empty(client: fastapi.testclient.TestClient) -> None:
     assert data["title"] == "Upcoming events"
     assert data["theme"] == "auto"
     assert data["language"] == "auto"
+    assert data["started_keep_minutes"] == 5
+    assert (data["warn_minutes"], data["warn_color"]) == (15, "#ff8c00")
+    assert (data["alert_minutes"], data["alert_color"]) == (3, "#e53935")
+
+
+def test_alert_allowed_when_warn_disabled(client: fastapi.testclient.TestClient) -> None:
+    resp = client.put("/api/config", json={"warn_minutes": 0, "alert_minutes": 10})
+    assert resp.status_code == 200
 
 
 @respx.mock
@@ -203,3 +221,25 @@ def test_favicon(client: fastapi.testclient.TestClient) -> None:
         assert resp.status_code == 200
         assert resp.headers["content-type"].startswith("image/svg+xml")
         assert resp.text.lstrip().startswith("<svg")
+
+
+@pytest.mark.parametrize(("keep", "expected"), [(5, ["Soon"]), (1, [])])
+def test_started_events_kept(
+    client: fastapi.testclient.TestClient, respx_mock: respx.Router, keep: int, expected: list
+) -> None:
+    respx_mock.get("https://cal.example/a.ics").mock(
+        return_value=httpx.Response(200, content=_ics_starting_in(-2))
+    )
+    cfg = client.put(
+        "/api/config",
+        json={
+            "started_keep_minutes": keep,
+            "calendars": [{"name": "C", "url": "https://cal.example/a.ics"}],
+        },
+    ).json()
+    titles = [ev["title"] for ev in client.get("/api/events").json()["calendars"][0]["events"]]
+    assert titles == expected
+    cal_id = cfg["calendars"][0]["id"]
+    single = client.get(f"/api/calendars/{cal_id}/events").json()
+    assert [ev["title"] for ev in single["calendar"]["events"]] == expected
+    assert single["started_keep_minutes"] == keep

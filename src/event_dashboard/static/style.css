@@ -1,6 +1,7 @@
 :root {
   --bg: #f5f6f8;
   --card: #ffffff;
+  --bar-started: #d1d5db;
   --text: #1d2330;
   --muted: #6b7280;
   --track: #e5e7eb;
@@ -12,6 +13,7 @@
 :root[data-theme="dark"] {
   --bg: #111827;
   --card: #1f2937;
+  --bar-started: #9ca3af;
   --text: #f3f4f6;
   --muted: #9ca3af;
   --track: #374151;
@@ -24,6 +26,7 @@
   :root[data-theme="auto"] {
     --bg: #111827;
     --card: #1f2937;
+  --bar-started: #9ca3af;
     --text: #f3f4f6;
     --muted: #9ca3af;
     --track: #374151;
@@ -67,7 +70,14 @@ button { padding: .4rem .9rem; cursor: pointer; }
 .event-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .event-time { color: var(--muted); white-space: nowrap; }
 .bar { height: 14px; background: var(--track); border-radius: 7px; overflow: hidden; }
-.bar-fill { height: 100%; background: var(--cal-color); transition: width 1s linear; }
+.bar-fill { height: 100%; background: var(--bar-color, var(--cal-color)); transition: width 1s linear, background-color .5s; }
+.event.started .bar-fill { background: var(--bar-started); }
+.event.alert .bar-fill { animation: blink 4s ease-in-out infinite; }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .event.alert .bar-fill { animation: none; } }
+.threshold-row { display: flex; gap: 1rem; align-items: flex-end; }
+.threshold-row .color-label span { display: block; }
+.color-label input[type="color"] { display: block; margin-top: .25rem; width: 3rem; height: 2.1rem; padding: 0; }
 .muted { color: var(--muted); }
 .error { color: var(--error); }
 #settings-message.error { color: var(--error); }
