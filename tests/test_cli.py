@@ -7,6 +7,7 @@ import socket
 import subprocess
 
 import click.testing
+import fastapi.testclient
 import pytest
 
 from event_dashboard import __main__ as main
@@ -142,6 +143,13 @@ def test_serve_with_tls(
     assert app_cfg.ssl_keyfile_password is None
     assert redirect_cfg.port == 80
     assert redirect_cfg.ssl_certfile is None
+
+    configs.clear()
+    assert _serve(tmp_path, *args, "--public-https-port", "8443").exit_code == 0
+    redirect_app = configs[1].app
+    client = fastapi.testclient.TestClient(redirect_app)
+    resp = client.get("/x", headers={"host": "h:80"}, follow_redirects=False)
+    assert resp.headers["location"] == "https://h:8443/x"
 
     configs.clear()
     assert _serve(tmp_path, *args, "--http-redirect-port", "0").exit_code == 0

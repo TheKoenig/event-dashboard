@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import importlib.resources
 import json
 import logging
@@ -143,7 +144,19 @@ class ConfigStore:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
                 json.dump(config.model_dump(), handle, indent=2, ensure_ascii=False)
-            os.replace(tmp_name, self.path)
+            try:
+                os.replace(tmp_name, self.path)
+            except OSError as exc:
+                # A bind-mounted file (e.g. Docker ``-v ./config.json:/data/config.json``) cannot
+                # be replaced by rename; overwrite it in place instead.
+                if exc.errno not in (errno.EBUSY, errno.EXDEV):
+                    raise
+                logger.debug("Atomic replace of %s failed (%s), writing in place", self.path, exc)
+                with self.path.open("w", encoding="utf-8") as handle:
+                    json.dump(config.model_dump(), handle, indent=2, ensure_ascii=False)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                pathlib.Path(tmp_name).unlink(missing_ok=True)
         except BaseException:
             pathlib.Path(tmp_name).unlink(missing_ok=True)
             raise

@@ -53,19 +53,20 @@ Error messages from the server (validation and fetch errors) stay in English.
 uv run event-dashboard serve --help
 ```
 
-| Option            | Env variable                     | Default       |
-|-------------------|----------------------------------|---------------|
-| `--host`          | `EVENT_DASHBOARD_HOST`           | `127.0.0.1`   |
-| `--port`          | `EVENT_DASHBOARD_PORT`           | `443` with TLS, else `80` |
-| `--http-redirect-port` | `EVENT_DASHBOARD_HTTP_REDIRECT_PORT` | `80` (TLS only, `0` = off) |
-| `--config`        | `EVENT_DASHBOARD_CONFIG`         | `config.json` |
-| `--fetch-timeout` | `EVENT_DASHBOARD_FETCH_TIMEOUT`  | `15` s (min 3 s) |
-| `--cache-ttl`     | `EVENT_DASHBOARD_CACHE_TTL`      | `3600` s (1 h, min 120 s) |
-| `--ca-bundle`     | `EVENT_DASHBOARD_CA_BUNDLE`      | none          |
-| `--ssl-certfile`  | `EVENT_DASHBOARD_SSL_CERTFILE`   | none (HTTP)   |
-| `--ssl-keyfile`   | `EVENT_DASHBOARD_SSL_KEYFILE`    | none          |
-| `--ssl-keyfile-password` | `EVENT_DASHBOARD_SSL_KEYFILE_PASSWORD` | none |
-| `--log-level`     | `EVENT_DASHBOARD_LOG_LEVEL`      | `INFO`        |
+| Option                   | Env variable                           | Default                                        |
+|--------------------------|----------------------------------------|------------------------------------------------|
+| `--host`                 | `EVENT_DASHBOARD_HOST`                 | `127.0.0.1`                                    |
+| `--port`                 | `EVENT_DASHBOARD_PORT`                 | `443` with TLS, else `80`                      |
+| `--http-redirect-port`   | `EVENT_DASHBOARD_HTTP_REDIRECT_PORT`   | `80` (TLS only, `0` = off)                     |
+| `--public-https-port`    | `EVENT_DASHBOARD_PUBLIC_HTTPS_PORT`    | `--port` (redirect target behind port mapping) |
+| `--config`               | `EVENT_DASHBOARD_CONFIG`               | `config.json`                                  |
+| `--fetch-timeout`        | `EVENT_DASHBOARD_FETCH_TIMEOUT`        | `15` s (min 3 s)                               |
+| `--cache-ttl`            | `EVENT_DASHBOARD_CACHE_TTL`            | `3600` s (1 h, min 120 s)                      |
+| `--ca-bundle`            | `EVENT_DASHBOARD_CA_BUNDLE`            | none                                           |
+| `--ssl-certfile`         | `EVENT_DASHBOARD_SSL_CERTFILE`         | none (HTTP)                                    |
+| `--ssl-keyfile`          | `EVENT_DASHBOARD_SSL_KEYFILE`          | none                                           |
+| `--ssl-keyfile-password` | `EVENT_DASHBOARD_SSL_KEYFILE_PASSWORD` | none                                           |
+| `--log-level`            | `EVENT_DASHBOARD_LOG_LEVEL`            | `INFO`                                         |
 
 ### HTTPS for the dashboard
 
@@ -113,6 +114,45 @@ If a calendar shows *"TLS certificate not trusted"*, point `--ca-bundle` (or
 - `GET /api/calendars/{id}/events`: events of a single calendar (`?refresh=true` re-downloads only that one)
 - `GET /api/config` / `PUT /api/config`: read or replace the configuration
 - `GET /api/languages`: available UI translations
+
+## Docker
+
+`Dockerfile` builds a slim image (uv-based, non-root user, health check). `docker-compose.yaml`
+runs it with HTTPS on port 443, an HTTP→HTTPS redirect on port 80, and `./config.json`
+bind-mounted into the container (settings saved in the UI are written back to that file).
+
+```bash
+# 1. Certificate and key in ./certs (see "HTTPS for the dashboard"); for testing:
+mkdir -p certs && openssl req -x509 -newkey rsa:2048 -nodes -days 365 -subj /CN=localhost \
+  -addext "subjectAltName=DNS:localhost,IP:127.0.0.1" -keyout certs/key.pem -out certs/cert.pem
+
+# 2. The config file must exist before starting (otherwise Docker creates a directory)
+[ -f config.json ] || echo '{}' > config.json
+
+# 3. Run as your own UID/GID so the container can read certs/key.pem and write config.json
+echo "DASHBOARD_UID=$(id -u)" >> .env && echo "DASHBOARD_GID=$(id -g)" >> .env
+
+# 4. Build and start
+docker compose up -d --build
+```
+
+Edits to `config.json` on the host take effect after `docker compose restart`.
+
+Then open <https://localhost>. Compose reads these optional variables from `.env` or the shell:
+
+| Variable                          | Default                              | Purpose                                                             |
+|-----------------------------------|--------------------------------------|---------------------------------------------------------------------|
+| `DASHBOARD_HTTPS_PORT`            | `443`                                | Host port for HTTPS (also used as redirect target)                  |
+| `DASHBOARD_HTTP_PORT`             | `80`                                 | Host port that redirects to HTTPS                                   |
+| `DASHBOARD_UID` / `DASHBOARD_GID` | `1000`                               | Container user; must read `certs/key.pem`, write `config.json`      |
+| `DASHBOARD_CA_BUNDLE`             | `/etc/ssl/certs/ca-certificates.crt` | Host CA bundle trusted for builds and downloads (company proxy CAs) |
+| `EVENT_DASHBOARD_CACHE_TTL`       | `3600`                               | Passed to the app (see CLI options)                                 |
+| `EVENT_DASHBOARD_FETCH_TIMEOUT`   | `15`                                 | Passed to the app (see CLI options)                                 |
+| `EVENT_DASHBOARD_LOG_LEVEL`       | `INFO`                               | Passed to the app (see CLI options)                                 |
+
+Proxy settings (`HTTP(S)_PROXY`, `NO_PROXY`) are passed in by Docker if configured in
+`~/.docker/config.json` (`"proxies"`). Note that `127.0.0.1` in the container is the container
+itself; use the host's Docker bridge IP (e.g. `172.17.0.1`) for a proxy on the host.
 
 ## Development
 

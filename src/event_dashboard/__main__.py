@@ -176,6 +176,14 @@ def cli() -> None:
     help="With TLS: plain HTTP port that redirects to HTTPS (0 disables). Ignored without TLS.",
 )
 @click.option(
+    "--public-https-port",
+    envvar="EVENT_DASHBOARD_PUBLIC_HTTPS_PORT",
+    default=None,
+    type=click.IntRange(min=1, max=65535),
+    help="HTTPS port used in redirects, if clients reach it via another port (e.g. Docker "
+    "port mapping).  [default: --port]",
+)
+@click.option(
     "--log-level",
     envvar="EVENT_DASHBOARD_LOG_LEVEL",
     default="INFO",
@@ -193,6 +201,7 @@ def serve(
     ssl_keyfile: str | None,
     ssl_keyfile_password: str | None,
     http_redirect_port: int,
+    public_https_port: int | None,
     log_level: str,
 ) -> None:
     """Start the web server (HTTPS when a certificate and key are given)."""
@@ -234,7 +243,7 @@ def serve(
             raise click.UsageError("--http-redirect-port must differ from --port.")
         configs.append(
             uvicorn.Config(
-                redirect.create_redirect_app(port),
+                redirect.create_redirect_app(public_https_port or port),
                 host=host,
                 port=http_redirect_port,
                 log_level="info",

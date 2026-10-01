@@ -1,6 +1,8 @@
 """Tests for configuration handling."""
 
+import errno
 import json
+import os
 import pathlib
 
 import pydantic
@@ -112,3 +114,33 @@ def test_unknown_language_still_loads(tmp_path: pathlib.Path) -> None:
 
 def test_available_languages() -> None:
     assert {"de", "en"} <= set(config.available_languages())
+
+
+@pytest.mark.parametrize("err", [errno.EBUSY, errno.EXDEV])
+def test_save_falls_back_to_in_place_write(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch, err: int
+) -> None:
+    path = tmp_path / "config.json"
+    store = config.ConfigStore(path)
+
+    def busy(src: str, dst: object) -> None:
+        raise OSError(err, os.strerror(err))
+
+    monkeypatch.setattr(config.os, "replace", busy)
+    store.update(config.AppConfig(range_minutes=42))
+    assert json.loads(path.read_text())["range_minutes"] == 42
+    assert [p.name for p in tmp_path.iterdir()] == ["config.json"]  # temp file removed
+
+
+def test_save_other_replace_errors_propagate(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store = config.ConfigStore(tmp_path / "config.json")
+
+    def denied(src: str, dst: object) -> None:
+        raise PermissionError(errno.EACCES, "denied")
+
+    monkeypatch.setattr(config.os, "replace", denied)
+    with pytest.raises(PermissionError):
+        store.update(config.AppConfig(range_minutes=42))
+    assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
