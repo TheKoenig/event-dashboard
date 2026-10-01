@@ -59,7 +59,18 @@ uv run event-dashboard serve --help
 | `--config`        | `EVENT_DASHBOARD_CONFIG`         | `config.json` |
 | `--fetch-timeout` | `EVENT_DASHBOARD_FETCH_TIMEOUT`  | `15` s        |
 | `--cache-ttl`     | `EVENT_DASHBOARD_CACHE_TTL`      | `300` s       |
+| `--ca-bundle`     | `EVENT_DASHBOARD_CA_BUNDLE`      | none          |
 | `--log-level`     | `EVENT_DASHBOARD_LOG_LEVEL`      | `INFO`        |
+
+### Corporate proxies and TLS certificates
+
+HTTPS downloads trust the certifi bundle **and** the operating system's CA bundle
+(e.g. `/etc/ssl/certs/ca-certificates.crt`), plus `SSL_CERT_FILE` / `SSL_CERT_DIR` if set. This means
+a TLS-inspecting company proxy works out of the box when its CA is installed system-wide. Proxy
+settings are taken from `HTTP(S)_PROXY` / `NO_PROXY`.
+
+If a calendar shows *"TLS certificate not trusted"*, point `--ca-bundle` (or
+`EVENT_DASHBOARD_CA_BUNDLE`) to a PEM file or directory containing the proxy's CA certificate.
 
 > **Security note:** the settings API has no authentication. Bind it to `127.0.0.1` or run it on a
 > trusted network only. Calendar URLs often contain secret tokens and are visible in the settings.

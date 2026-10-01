@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+import ssl
 
 import click
 import dotenv
@@ -50,6 +51,13 @@ def cli() -> None:
     help="Seconds to cache downloaded calendars.",
 )
 @click.option(
+    "--ca-bundle",
+    envvar="EVENT_DASHBOARD_CA_BUNDLE",
+    default=None,
+    type=click.Path(exists=True),
+    help="Extra CA certificate file/directory to trust (e.g. a TLS-inspecting proxy's CA).",
+)
+@click.option(
     "--log-level",
     envvar="EVENT_DASHBOARD_LOG_LEVEL",
     default="INFO",
@@ -57,7 +65,13 @@ def cli() -> None:
     show_default=True,
 )
 def serve(
-    host: str, port: int, config_path: str, fetch_timeout: float, cache_ttl: float, log_level: str
+    host: str,
+    port: int,
+    config_path: str,
+    fetch_timeout: float,
+    cache_ttl: float,
+    ca_bundle: str | None,
+    log_level: str,
 ) -> None:
     """Start the web server."""
     logging.basicConfig(
@@ -67,7 +81,12 @@ def serve(
         store = config.ConfigStore(os.path.abspath(config_path))
     except config.ConfigError as exc:
         raise click.ClickException(str(exc)) from exc
-    fetcher = calendar_fetch.CalendarFetcher(timeout=fetch_timeout, ttl=cache_ttl)
+    try:
+        fetcher = calendar_fetch.CalendarFetcher(
+            timeout=fetch_timeout, ttl=cache_ttl, ca_bundle=ca_bundle
+        )
+    except (OSError, ssl.SSLError) as exc:
+        raise click.ClickException(f"Invalid CA bundle {ca_bundle}: {exc}") from exc
     logger.info("Using config %s; serving on http://%s:%d", store.path, host, port)
     try:
         uvicorn.run(app_module.create_app(store, fetcher), host=host, port=port, log_level="info")
