@@ -1,0 +1,31 @@
+:root {
+  --bg: #f5f6f8;
+  --card: #ffffff;
+  --text: #1d2330;
+  --muted: #6b7280;
+  --track: #e5e7eb;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
+header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+header h1 { margin: 0; font-size: 1.4rem; }
+header small { color: var(--muted); font-weight: normal; font-size: .9rem; }
+#settings-toggle { font-size: 1.5rem; background: none; border: none; cursor: pointer; }
+main, #settings { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
+#settings { background: var(--card); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.calendar-row { display: grid; grid-template-columns: 1fr 2fr auto auto; gap: .5rem; margin-bottom: .5rem; }
+.calendar-row input { padding: .4rem; }
+.cal-color { width: 3rem; height: 2.2rem; padding: 0; }
+.actions { margin-top: 1rem; display: flex; gap: .5rem; }
+button { padding: .4rem .9rem; cursor: pointer; }
+.calendar { background: var(--card); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border-left: 6px solid var(--cal-color); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.calendar h2 { margin: 0 0 .75rem; font-size: 1.1rem; color: var(--cal-color); }
+.event { margin-bottom: .8rem; }
+.event-head { display: flex; justify-content: space-between; gap: 1rem; font-size: .95rem; margin-bottom: .25rem; }
+.event-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.event-time { color: var(--muted); white-space: nowrap; }
+.bar { height: 14px; background: var(--track); border-radius: 7px; overflow: hidden; }
+.bar-fill { height: 100%; background: var(--cal-color); transition: width 1s linear; }
+.muted { color: var(--muted); }
+.error { color: #b91c1c; }
+#settings-message.error { color: #b91c1c; }

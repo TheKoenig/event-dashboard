@@ -1,0 +1,85 @@
+"""FastAPI application exposing the dashboard and its JSON API."""
+
+from __future__ import annotations
+
+import concurrent.futures
+import datetime
+import importlib.resources
+import logging
+
+import fastapi
+import fastapi.responses
+import fastapi.staticfiles
+
+from event_dashboard import calendar_fetch, config, events
+
+logger = logging.getLogger(__name__)
+
+MAX_WORKERS = 8
+
+
+def _calendar_payload(
+    cal: config.CalendarConfig,
+    fetcher: calendar_fetch.CalendarFetcher,
+    now: datetime.datetime,
+    window: datetime.timedelta,
+) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "id": cal.id,
+        "name": cal.name,
+        "color": cal.color,
+        "error": None,
+        "events": [],
+    }
+    try:
+        data = fetcher.fetch(cal.url)
+        payload["events"] = [ev.to_dict() for ev in events.upcoming_events(data, now, window)]
+    except (calendar_fetch.FetchError, events.ParseError) as exc:
+        logger.warning("Calendar %r failed: %s", cal.name, exc)
+        payload["error"] = str(exc)
+    return payload
+
+
+def create_app(
+    store: config.ConfigStore, fetcher: calendar_fetch.CalendarFetcher
+) -> fastapi.FastAPI:
+    """Build the FastAPI application.
+
+    Args:
+        store: Configuration store.
+        fetcher: Calendar fetcher with cache.
+
+    Returns:
+        Configured FastAPI app.
+    """
+    app = fastapi.FastAPI(title="Event Dashboard", docs_url=None, redoc_url=None)
+    static_dir = importlib.resources.files("event_dashboard") / "static"
+
+    @app.get("/api/config")
+    def get_config() -> config.AppConfig:
+        return store.get()
+
+    @app.put("/api/config")
+    def put_config(new_config: config.AppConfig) -> config.AppConfig:
+        return store.update(new_config)
+
+    @app.get("/api/events")
+    def get_events() -> dict[str, object]:
+        cfg = store.get()
+        now = datetime.datetime.now(datetime.timezone.utc)
+        window = datetime.timedelta(minutes=cfg.range_minutes)
+        calendars: list[dict[str, object]] = []
+        if cfg.calendars:
+            workers = min(MAX_WORKERS, len(cfg.calendars))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                calendars = list(
+                    pool.map(lambda c: _calendar_payload(c, fetcher, now, window), cfg.calendars)
+                )
+        return {"now": now.isoformat(), "range_minutes": cfg.range_minutes, "calendars": calendars}
+
+    @app.get("/", include_in_schema=False)
+    def index() -> fastapi.responses.FileResponse:
+        return fastapi.responses.FileResponse(str(static_dir / "index.html"))
+
+    app.mount("/static", fastapi.staticfiles.StaticFiles(directory=str(static_dir)), name="static")
+    return app

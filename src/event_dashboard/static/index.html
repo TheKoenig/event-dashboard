@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Event Dashboard</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <h1>Upcoming events <small id="range-label"></small></h1>
+    <button id="settings-toggle" type="button" title="Settings" aria-expanded="false" aria-controls="settings">⚙</button>
+  </header>
+
+  <section id="settings" hidden>
+    <h2>Settings</h2>
+    <form id="settings-form">
+      <label>Time range (minutes)
+        <input id="range-input" type="number" min="1" max="10080" required>
+      </label>
+      <h3>Calendars</h3>
+      <div id="calendar-list"></div>
+      <button type="button" id="add-calendar">+ Add calendar</button>
+      <div class="actions">
+        <button type="submit">Save</button>
+        <button type="button" id="cancel-settings">Cancel</button>
+      </div>
+      <p id="settings-message" role="status"></p>
+    </form>
+  </section>
+
+  <main id="dashboard"><p class="muted">Loading…</p></main>
+
+  <template id="calendar-row">
+    <div class="calendar-row">
+      <input class="cal-name" placeholder="Name" required maxlength="100">
+      <input class="cal-url" placeholder="webcal://… or https://….ics" required>
+      <input class="cal-color" type="color">
+      <button type="button" class="cal-remove" title="Remove">✕</button>
+    </div>
+  </template>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
