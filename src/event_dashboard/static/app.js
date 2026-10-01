@@ -37,6 +37,13 @@ function formatStart(date, allDay) {
   return date.toLocaleString(dateLocale(), opts) + (allDay ? ` ${t("allDay")}` : "");
 }
 
+function formatDuration(minutes) {
+  if (minutes <= 60) return t("durationMinutes", { m: minutes });
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? t("durationHoursMinutes", { h, m }) : t("durationHours", { h });
+}
+
 function formatCountdown(ms) {
   if (ms <= 0) return t("startingNow");
   const totalMin = Math.ceil(ms / 60000);
@@ -50,7 +57,7 @@ function render() {
   main.replaceChildren();
   applyAppearance(state.title, state.theme);
   updateRefreshTooltip();
-  $("#range-label").textContent = t("rangeLabel", { minutes: state.rangeMinutes });
+  $("#range-label").textContent = t("rangeLabel", { duration: formatDuration(state.rangeMinutes) });
   if (!state.calendars.length) {
     main.append(el("p", { class: "muted" }, t("noCalendars")));
     return;
