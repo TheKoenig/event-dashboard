@@ -30,6 +30,7 @@ Settings are stored server-side in a JSON file (default `config.json`), so all v
 - Calendars are downloaded at most once per cache TTL (default 1 h). If a refresh fails, the last good copy is used.
 - The **reload** button next to ⚙ downloads all calendars immediately, bypassing the cache (useful right
   after adding an event). Its hover text shows when the data was last updated.
+- Each calendar card also has its own small reload button that downloads only that calendar.
 - Repeating events (RRULE/EXDATE), time zones, all-day and floating events, and cancelled events are all handled.
 - If a calendar fails to load or parse, the error is shown in that calendar's section.
 
@@ -78,6 +79,7 @@ If a calendar shows *"TLS certificate not trusted"*, point `--ca-bundle` (or
 ## API
 
 - `GET /api/events`: upcoming events grouped by calendar (`?refresh=true` bypasses the cache)
+- `GET /api/calendars/{id}/events`: events of a single calendar (`?refresh=true` re-downloads only that one)
 - `GET /api/config` / `PUT /api/config`: read or replace the configuration
 - `GET /api/languages`: available UI translations
 

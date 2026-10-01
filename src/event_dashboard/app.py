@@ -107,6 +107,22 @@ def create_app(
             "calendars": calendars,
         }
 
+    @app.get("/api/calendars/{calendar_id}/events")
+    def get_calendar_events(calendar_id: str, refresh: bool = False) -> dict[str, object]:
+        cfg = store.get()
+        cal = next((c for c in cfg.calendars if c.id == calendar_id), None)
+        if cal is None:
+            raise fastapi.HTTPException(status_code=404, detail="Unknown calendar")
+        if refresh:
+            logger.info("Manual refresh requested for calendar %r", cal.name)
+        now = datetime.datetime.now(datetime.timezone.utc)
+        window = datetime.timedelta(minutes=cfg.range_minutes)
+        return {
+            "now": now.isoformat(),
+            "range_minutes": cfg.range_minutes,
+            "calendar": _calendar_payload(cal, fetcher, now, window, force=refresh),
+        }
+
     @app.get("/favicon.ico", include_in_schema=False)
     def favicon() -> fastapi.responses.FileResponse:
         # Browsers request /favicon.ico by default; serve the SVG to avoid 404s.

@@ -48,7 +48,7 @@ header small { color: var(--muted); font-weight: normal; font-size: .9rem; }
 .icon-button:focus { outline: none; }
 .icon-button:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; border-radius: 4px; }
 .icon-button:disabled { cursor: progress; opacity: .6; }
-#refresh-button.loading { animation: spin 1s linear infinite; }
+.icon-button.loading { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 main, #settings { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 #settings { background: var(--card); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
@@ -58,7 +58,10 @@ main, #settings { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 .actions { margin-top: 1rem; display: flex; gap: .5rem; }
 button { padding: .4rem .9rem; cursor: pointer; }
 .calendar { background: var(--card); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; border-left: 6px solid var(--cal-color); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
-.calendar h2 { margin: 0 0 .75rem; font-size: 1.1rem; color: var(--cal-color); }
+.calendar-head { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin: 0 0 .75rem; }
+.calendar-refresh { font-size: 1.1rem; color: var(--muted); }
+.calendar-refresh:hover:not(:disabled) { color: var(--text); }
+.calendar h2 { margin: 0; font-size: 1.1rem; color: var(--cal-color); }
 .event { margin-bottom: .8rem; }
 .event-head { display: flex; justify-content: space-between; gap: 1rem; font-size: .95rem; margin-bottom: .25rem; }
 .event-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

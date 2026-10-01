@@ -3,6 +3,8 @@
   "settings": "Einstellungen",
   "refreshTooltip": "Kalender jetzt neu laden (z. B. nach dem Hinzufügen eines Termins)",
   "lastUpdated": "Zuletzt aktualisiert: {time}",
+  "refreshCalendarTooltip": "Kalender „{name}“ jetzt neu laden",
+  "refreshCalendarFailed": "Neu laden fehlgeschlagen: {message}",
   "pageTitle": "Seitentitel",
   "theme": "Design",
   "themeAuto": "Automatisch (System)",

@@ -3,6 +3,8 @@
   "settings": "Settings",
   "refreshTooltip": "Reload calendars now (e.g. after adding an event)",
   "lastUpdated": "Last updated: {time}",
+  "refreshCalendarTooltip": "Reload calendar “{name}” now",
+  "refreshCalendarFailed": "Reload failed: {message}",
   "pageTitle": "Page title",
   "theme": "Theme",
   "themeAuto": "Auto (system)",

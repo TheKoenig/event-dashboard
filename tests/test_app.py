@@ -154,6 +154,48 @@ def test_manual_refresh_bypasses_cache(
     assert route.call_count == 2
 
 
+@respx.mock
+def test_single_calendar_refresh(
+    cached_client: fastapi.testclient.TestClient, respx_mock: respx.Router
+) -> None:
+    route_a = respx_mock.get("https://cal.example/a.ics")
+    route_a.side_effect = [
+        httpx.Response(200, content=_ics_starting_in(10)),
+        httpx.Response(200, content=_ics_starting_in(20).replace(b"Soon", b"Added later")),
+    ]
+    route_b = respx_mock.get("https://cal.example/b.ics").mock(
+        return_value=httpx.Response(200, content=_ics_starting_in(30))
+    )
+    cfg = cached_client.put(
+        "/api/config",
+        json={
+            "range_minutes": 90,
+            "calendars": [
+                {"name": "A", "url": "https://cal.example/a.ics", "color": "#00ff00"},
+                {"name": "B", "url": "https://cal.example/b.ics"},
+            ],
+        },
+    ).json()
+    cal_a = cfg["calendars"][0]["id"]
+    cached_client.get("/api/events")
+
+    data = cached_client.get(f"/api/calendars/{cal_a}/events?refresh=true").json()
+    assert data["range_minutes"] == 90
+    assert data["calendar"]["id"] == cal_a
+    assert data["calendar"]["color"] == "#00ff00"
+    assert [ev["title"] for ev in data["calendar"]["events"]] == ["Added later"]
+    assert route_a.call_count == 2
+    assert route_b.call_count == 1  # other calendars are not re-downloaded
+
+    cached = cached_client.get(f"/api/calendars/{cal_a}/events").json()
+    assert [ev["title"] for ev in cached["calendar"]["events"]] == ["Added later"]
+    assert route_a.call_count == 2
+
+
+def test_single_calendar_unknown(client: fastapi.testclient.TestClient) -> None:
+    assert client.get("/api/calendars/nope/events?refresh=true").status_code == 404
+
+
 def test_favicon(client: fastapi.testclient.TestClient) -> None:
     assert 'rel="icon" href="/static/favicon.svg"' in client.get("/").text
     for url in ("/static/favicon.svg", "/favicon.ico"):

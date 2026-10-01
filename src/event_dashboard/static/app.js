@@ -55,28 +55,70 @@ function render() {
     main.append(el("p", { class: "muted" }, t("noCalendars")));
     return;
   }
-  for (const cal of state.calendars) {
-    const section = el("section", { class: "calendar" });
-    section.style.setProperty("--cal-color", cal.color);
-    section.append(el("h2", {}, cal.name));
-    if (cal.error) section.append(el("p", { class: "error" }, t("error", { message: cal.error })));
-    else if (!cal.events.length) section.append(el("p", { class: "muted" }, t("noEvents")));
-    for (const ev of cal.events) {
-      const row = el("div", { class: "event" });
-      const head = el("div", { class: "event-head" });
-      head.append(el("span", { class: "event-title", title: ev.title }, ev.title));
-      const time = el("span", { class: "event-time" });
-      head.append(time);
-      const bar = el("div", { class: "bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100" });
-      const fill = el("div", { class: "bar-fill" });
-      bar.append(fill);
-      row.append(head, bar);
-      row._ev = { start: new Date(ev.start), allDay: ev.all_day, time, fill, bar };
-      section.append(row);
-    }
-    main.append(section);
-  }
+  for (const cal of state.calendars) main.append(renderCalendar(cal));
   tick();
+}
+
+function formatTime(date) {
+  return date.toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function renderCalendar(cal) {
+  const section = el("section", { class: "calendar" });
+  section.dataset.id = cal.id;
+  section.style.setProperty("--cal-color", cal.color);
+  const header = el("div", { class: "calendar-head" });
+  const button = el("button", { type: "button", class: "icon-button calendar-refresh" });
+  button.append($("#refresh-button svg").cloneNode(true));
+  let tooltip = t("refreshCalendarTooltip", { name: cal.name });
+  if (cal.updated) tooltip += "\n" + t("lastUpdated", { time: formatTime(cal.updated) });
+  button.title = tooltip;
+  button.setAttribute("aria-label", t("refreshCalendarTooltip", { name: cal.name }));
+  button.addEventListener("click", () => refreshCalendar(cal.id, button));
+  header.append(el("h2", {}, cal.name), button);
+  section.append(header);
+  if (cal.error) section.append(el("p", { class: "error" }, t("error", { message: cal.error })));
+  else if (!cal.events.length) section.append(el("p", { class: "muted" }, t("noEvents")));
+  for (const ev of cal.events) {
+    const row = el("div", { class: "event" });
+    const head = el("div", { class: "event-head" });
+    head.append(el("span", { class: "event-title", title: ev.title }, ev.title));
+    const time = el("span", { class: "event-time" });
+    head.append(time);
+    const bar = el("div", { class: "bar", role: "progressbar", "aria-valuemin": "0", "aria-valuemax": "100" });
+    const fill = el("div", { class: "bar-fill" });
+    bar.append(fill);
+    row.append(head, bar);
+    row._ev = { start: new Date(ev.start), allDay: ev.all_day, time, fill, bar };
+    section.append(row);
+  }
+  return section;
+}
+
+async function refreshCalendar(id, button) {
+  if (button.disabled) return;
+  button.disabled = true;
+  button.classList.add("loading");
+  try {
+    const resp = await fetch(`/api/calendars/${encodeURIComponent(id)}/events?refresh=true`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const cal = { ...data.calendar, updated: new Date() };
+    const index = state.calendars.findIndex((c) => c.id === id);
+    const section = document.querySelector(`#dashboard .calendar[data-id="${CSS.escape(id)}"]`);
+    if (index < 0 || !section || data.range_minutes !== state.rangeMinutes) {
+      await loadEvents(); // config changed meanwhile; reload everything
+      return;
+    }
+    state.calendars[index] = cal;
+    section.replaceWith(renderCalendar(cal));
+    tick();
+  } catch (err) {
+    button.title = t("refreshCalendarFailed", { message: err.message });
+  } finally {
+    button.disabled = false;
+    button.classList.remove("loading");
+  }
 }
 
 function tick() {
@@ -96,8 +138,7 @@ function updateRefreshTooltip() {
   const button = $("#refresh-button");
   let text = t("refreshTooltip");
   if (lastUpdated) {
-    const time = lastUpdated.toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    text += "\n" + t("lastUpdated", { time });
+    text += "\n" + t("lastUpdated", { time: formatTime(lastUpdated) });
   }
   button.title = text;
 }
@@ -107,16 +148,17 @@ async function loadEvents(refresh = false) {
     const resp = await fetch(refresh ? "/api/events?refresh=true" : "/api/events");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
+    const updated = new Date();
     state = {
       title: data.title,
       theme: data.theme,
       language: data.language || "auto",
       rangeMinutes: data.range_minutes,
-      calendars: data.calendars,
+      calendars: data.calendars.map((cal) => ({ ...cal, updated })),
     };
     // Don't switch the UI language under an open settings panel (it may be previewing another one).
     if ($("#settings").hidden && (await setLanguage(state.language))) translateDocument();
-    lastUpdated = new Date();
+    lastUpdated = updated;
     render();
   } catch (err) {
     $("#dashboard").replaceChildren(el("p", { class: "error" }, t("loadEventsFailed", { message: err.message })));
