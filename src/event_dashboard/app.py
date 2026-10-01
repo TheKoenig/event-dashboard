@@ -107,6 +107,13 @@ def create_app(
             "calendars": calendars,
         }
 
+    @app.get("/favicon.ico", include_in_schema=False)
+    def favicon() -> fastapi.responses.FileResponse:
+        # Browsers request /favicon.ico by default; serve the SVG to avoid 404s.
+        return fastapi.responses.FileResponse(
+            str(static_dir / "favicon.svg"), media_type="image/svg+xml"
+        )
+
     @app.get("/", include_in_schema=False)
     def index() -> fastapi.responses.FileResponse:
         return fastapi.responses.FileResponse(str(static_dir / "index.html"))

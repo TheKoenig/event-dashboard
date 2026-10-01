@@ -152,3 +152,12 @@ def test_manual_refresh_bypasses_cache(
     assert route.call_count == 1
     assert titles("/api/events?refresh=true") == ["Added later"]
     assert route.call_count == 2
+
+
+def test_favicon(client: fastapi.testclient.TestClient) -> None:
+    assert 'rel="icon" href="/static/favicon.svg"' in client.get("/").text
+    for url in ("/static/favicon.svg", "/favicon.ico"):
+        resp = client.get(url)
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("image/svg+xml")
+        assert resp.text.lstrip().startswith("<svg")
