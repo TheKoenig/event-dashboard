@@ -27,3 +27,10 @@ htmlcov/
 # Local config / secrets
 .env
 config.json
+
+# TLS keys and certificates
+*.pem
+*.key
+
+# Locally generated test certificates
+certs/
