@@ -144,3 +144,18 @@ def test_save_other_replace_errors_propagate(
     with pytest.raises(PermissionError):
         store.update(config.AppConfig(range_minutes=42))
     assert [p.name for p in tmp_path.iterdir()] == ["config.json"]
+
+
+@pytest.mark.parametrize(
+    ("range_minutes", "later_hours", "expected"),
+    [(120, 0, 120), (120, 3, 180), (30, 1, 60)],
+)
+def test_lookahead_minutes(range_minutes: int, later_hours: int, expected: int) -> None:
+    cfg = config.AppConfig(range_minutes=range_minutes, later_hours=later_hours)
+    assert cfg.lookahead_minutes == expected
+
+
+@pytest.mark.parametrize(("range_minutes", "later_hours"), [(120, 2), (120, 1), (60, 1)])
+def test_later_hours_must_exceed_range(range_minutes: int, later_hours: int) -> None:
+    with pytest.raises(pydantic.ValidationError, match="later_hours"):
+        config.AppConfig(range_minutes=range_minutes, later_hours=later_hours)

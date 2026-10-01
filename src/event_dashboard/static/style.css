@@ -71,6 +71,10 @@ button { padding: .4rem .9rem; cursor: pointer; }
 .event-time { color: var(--muted); white-space: nowrap; }
 .bar { height: 14px; background: var(--track); border-radius: 7px; overflow: hidden; }
 .bar-fill { height: 100%; background: var(--bar-color, var(--cal-color)); transition: width 1s linear, background-color .5s; }
+.later-heading { margin: 1rem 0 .5rem; padding-top: .6rem; border-top: 1px solid var(--border); font-size: .85rem; font-weight: 600; color: var(--muted); }
+.event.later { margin-bottom: .4rem; }
+.event.later .event-head { margin-bottom: 0; }
+.event.later .event-title { font-weight: normal; }
 .event.started .bar-fill { background: var(--bar-started); }
 .event.alert .bar-fill { animation: blink 4s ease-in-out infinite; }
 @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }

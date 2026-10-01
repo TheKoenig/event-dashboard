@@ -47,6 +47,7 @@ def _calendar_payload(
 def _display_settings(cfg: config.AppConfig) -> dict[str, object]:
     """Return the progress-bar display settings sent with every events response."""
     return {
+        "later_hours": cfg.later_hours,
         "started_keep_minutes": cfg.started_keep_minutes,
         "warn_minutes": cfg.warn_minutes,
         "warn_color": cfg.warn_color,
@@ -97,7 +98,7 @@ def create_app(
     def get_events(refresh: bool = False) -> dict[str, object]:
         cfg = store.get()
         now = datetime.datetime.now(datetime.timezone.utc)
-        window = datetime.timedelta(minutes=cfg.range_minutes)
+        window = datetime.timedelta(minutes=cfg.lookahead_minutes)
         keep = datetime.timedelta(minutes=cfg.started_keep_minutes)
         calendars: list[dict[str, object]] = []
         if refresh:
@@ -134,7 +135,7 @@ def create_app(
         if refresh:
             logger.info("Manual refresh requested for calendar %r", cal.name)
         now = datetime.datetime.now(datetime.timezone.utc)
-        window = datetime.timedelta(minutes=cfg.range_minutes)
+        window = datetime.timedelta(minutes=cfg.lookahead_minutes)
         keep = datetime.timedelta(minutes=cfg.started_keep_minutes)
         return {
             "now": now.isoformat(),

@@ -49,6 +49,7 @@ def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
         "theme": "auto",
         "language": "auto",
         "range_minutes": 120,
+        "later_hours": 0,
         "started_keep_minutes": 5,
         "warn_minutes": 15,
         "warn_color": "#ff8c00",
@@ -87,6 +88,10 @@ def test_config_roundtrip(client: fastapi.testclient.TestClient) -> None:
         {"warn_color": "orange"},
         {"alert_color": "#12345"},
         {"warn_minutes": 5, "alert_minutes": 10},
+        {"later_hours": -1},
+        {"later_hours": 169},
+        {"later_hours": 2, "range_minutes": 120},
+        {"later_hours": 1.5},
     ],
 )
 def test_config_validation(client: fastapi.testclient.TestClient, body: dict) -> None:
@@ -102,6 +107,7 @@ def test_events_empty(client: fastapi.testclient.TestClient) -> None:
     assert data["theme"] == "auto"
     assert data["language"] == "auto"
     assert data["started_keep_minutes"] == 5
+    assert data["later_hours"] == 0
     assert (data["warn_minutes"], data["warn_color"]) == (15, "#ff8c00")
     assert (data["alert_minutes"], data["alert_color"]) == (3, "#e53935")
 
@@ -243,3 +249,29 @@ def test_started_events_kept(
     single = client.get(f"/api/calendars/{cal_id}/events").json()
     assert [ev["title"] for ev in single["calendar"]["events"]] == expected
     assert single["started_keep_minutes"] == keep
+
+
+@pytest.mark.parametrize(("later_hours", "expected"), [(0, []), (4, ["Soon"]), (2, [])])
+def test_later_events_included(
+    client: fastapi.testclient.TestClient,
+    respx_mock: respx.Router,
+    later_hours: int,
+    expected: list,
+) -> None:
+    respx_mock.get("https://cal.example/a.ics").mock(
+        return_value=httpx.Response(200, content=_ics_starting_in(180))
+    )
+    cfg = client.put(
+        "/api/config",
+        json={
+            "range_minutes": 60,
+            "later_hours": later_hours,
+            "calendars": [{"name": "C", "url": "https://cal.example/a.ics"}],
+        },
+    ).json()
+    data = client.get("/api/events").json()
+    assert data["later_hours"] == later_hours
+    assert [ev["title"] for ev in data["calendars"][0]["events"]] == expected
+    single = client.get(f"/api/calendars/{cfg['calendars'][0]['id']}/events").json()
+    assert single["later_hours"] == later_hours
+    assert [ev["title"] for ev in single["calendar"]["events"]] == expected

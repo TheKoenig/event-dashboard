@@ -12,6 +12,7 @@ let state = {
   theme: "auto",
   language: "auto",
   rangeMinutes: 120,
+  laterHours: 0,
   startedKeepMinutes: 5,
   warnMinutes: 15,
   warnColor: "#ff8c00",
@@ -101,6 +102,10 @@ function renderCalendar(cal) {
   section.append(header);
   if (cal.error) section.append(el("p", { class: "error" }, t("error", { message: cal.error })));
   else section.append(el("p", { class: "muted no-events" }, t("noEvents")));
+  // Separates events with a progress bar from further events listed without one (see tick()).
+  const laterHeading = el("h3", { class: "later-heading" }, t("laterHeading", { duration: formatDuration(state.laterHours * 60) }));
+  laterHeading.hidden = true;
+  section.append(laterHeading);
   for (const ev of cal.events) {
     const row = el("div", { class: "event" });
     const head = el("div", { class: "event-head" });
@@ -128,7 +133,7 @@ async function refreshCalendar(id, button) {
     const cal = { ...data.calendar, updated: new Date() };
     const index = state.calendars.findIndex((c) => c.id === id);
     const section = document.querySelector(`#dashboard .calendar[data-id="${CSS.escape(id)}"]`);
-    if (index < 0 || !section || data.range_minutes !== state.rangeMinutes) {
+    if (index < 0 || !section || data.range_minutes !== state.rangeMinutes || data.later_hours !== state.laterHours) {
       await loadEvents(); // config changed meanwhile; reload everything
       return;
     }
@@ -159,6 +164,10 @@ function tick() {
     const ev = row._ev;
     const remaining = ev.start.getTime() - now;
     const started = remaining <= 0;
+    // Events beyond the bar range are listed without a bar until they move into the range.
+    const later = remaining > windowMs;
+    row.classList.toggle("later", later);
+    ev.bar.hidden = later;
     // Started events stay as a full grey bar until the keep time is over.
     row.hidden = started && -remaining >= keepMs;
     const phase = started ? "started" : phaseFor(remaining);
@@ -177,6 +186,13 @@ function tick() {
   document.querySelectorAll("#dashboard .calendar").forEach((section) => {
     const placeholder = section.querySelector(".no-events");
     if (placeholder) placeholder.hidden = !!section.querySelector(".event:not([hidden])");
+    // Rows are sorted by start, so the later rows always form the tail of the list.
+    const heading = section.querySelector(".later-heading");
+    const firstLater = section.querySelector(".event.later");
+    if (heading) {
+      heading.hidden = !firstLater;
+      if (firstLater && heading.nextElementSibling !== firstLater) section.insertBefore(heading, firstLater);
+    }
   });
 }
 
@@ -191,6 +207,7 @@ function updateRefreshTooltip() {
 
 function displaySettings(data) {
   return {
+    laterHours: data.later_hours ?? 0,
     startedKeepMinutes: data.started_keep_minutes ?? 5,
     warnMinutes: data.warn_minutes ?? 15,
     warnColor: data.warn_color || "#ff8c00",
@@ -272,6 +289,7 @@ async function openSettings() {
     $("#title-input").value = isDefaultTitle(cfg.title) ? "" : cfg.title;
     $("#theme-input").value = cfg.theme;
     $("#range-input").value = cfg.range_minutes;
+    $("#later-hours-input").value = cfg.later_hours ?? 0;
     $("#started-keep-input").value = cfg.started_keep_minutes;
     $("#warn-minutes-input").value = cfg.warn_minutes;
     $("#warn-color-input").value = cfg.warn_color;
@@ -318,6 +336,7 @@ async function saveSettings(event) {
     theme: $("#theme-input").value,
     language: $("#language-input").value,
     range_minutes: parseInt($("#range-input").value, 10),
+    later_hours: parseInt($("#later-hours-input").value, 10),
     started_keep_minutes: parseInt($("#started-keep-input").value, 10),
     warn_minutes: parseInt($("#warn-minutes-input").value, 10),
     warn_color: $("#warn-color-input").value,

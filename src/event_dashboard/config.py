@@ -22,6 +22,7 @@ MAX_RANGE_MINUTES = 7 * 24 * 60
 ALLOWED_SCHEMES = ("http://", "https://", "webcal://", "webcals://")
 DEFAULT_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b")
 DEFAULT_TITLE = "Upcoming events"
+MAX_LATER_HOURS = MAX_RANGE_MINUTES // 60
 DEFAULT_STARTED_KEEP_MINUTES = 5
 MAX_STARTED_KEEP_MINUTES = 24 * 60
 DEFAULT_WARN_MINUTES = 15
@@ -92,7 +93,10 @@ class AppConfig(pydantic.BaseModel):
         title: Page title shown in the header and browser tab.
         theme: Color theme; ``auto`` follows the operating system preference.
         language: UI language code; ``auto`` uses the browser language.
-        range_minutes: Look-ahead window for upcoming events in minutes.
+        range_minutes: Look-ahead window for events shown with a progress bar, in minutes.
+        later_hours: Look-ahead window in full hours (counted from now) for further events that are
+            listed without a progress bar below the bars; 0 disables. Must be longer than
+            ``range_minutes`` unless 0.
         started_keep_minutes: How long a started event stays visible (full grey bar); 0 hides it
             immediately.
         warn_minutes: Bars switch to ``warn_color`` this many minutes before the start; 0 disables.
@@ -107,6 +111,7 @@ class AppConfig(pydantic.BaseModel):
     theme: Theme = "auto"
     language: str = pydantic.Field(default=AUTO_LANGUAGE, pattern=_LANGUAGE_PATTERN)
     range_minutes: int = pydantic.Field(default=DEFAULT_RANGE_MINUTES, ge=1, le=MAX_RANGE_MINUTES)
+    later_hours: int = pydantic.Field(default=0, ge=0, le=MAX_LATER_HOURS)
     started_keep_minutes: int = pydantic.Field(
         default=DEFAULT_STARTED_KEEP_MINUTES, ge=0, le=MAX_STARTED_KEEP_MINUTES
     )
@@ -131,6 +136,17 @@ class AppConfig(pydantic.BaseModel):
         if self.warn_minutes and self.alert_minutes > self.warn_minutes:
             raise ValueError("alert_minutes must not be greater than warn_minutes")
         return self
+
+    @pydantic.model_validator(mode="after")
+    def _later_beyond_range(self) -> AppConfig:
+        if self.later_hours and self.later_hours * 60 <= self.range_minutes:
+            raise ValueError("later_hours must be 0 or longer than range_minutes")
+        return self
+
+    @property
+    def lookahead_minutes(self) -> int:
+        """Total look-ahead in minutes: the longer of the bar range and the later window."""
+        return max(self.range_minutes, self.later_hours * 60)
 
     @pydantic.model_validator(mode="after")
     def _unique_ids(self) -> AppConfig:

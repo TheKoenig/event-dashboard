@@ -17,7 +17,9 @@ Open <http://127.0.0.1> (or <https://127.0.0.1> with TLS), then click **⚙** to
 - set the page title (shown in the header and browser tab)
 - pick a theme: **Auto** (follows the OS light/dark setting), **Light** or **Dark**
 - pick a language: **Auto (browser)** (default) or a specific language
-- set the time range in minutes (1–10080)
+- set the time range in minutes (1–10080) for events shown with a progress bar
+- set a further time window in full hours from now (0 = off, default): events starting after the progress-bar
+  range but within this window are listed below the bars, without a bar, under a "Later" heading
 - set the progress bar behavior: how long started events stay visible (default 5 min), and the
   warning (default 15 min, orange) and alert (default 3 min, red) thresholds and colors (0 = off)
 - add or remove calendars (name, ICS/webcal URL, color)
@@ -32,6 +34,7 @@ Settings are stored server-side in a JSON file (default `config.json`), so all v
   the alert color and slowly fades in and out (4 s period, off when the OS "reduce motion" setting is on).
 - Once an event has started, its bar stays full and light grey with "started X min ago" for the
   configured time (default 5 min), then disappears.
+- Events in the "Later" list move up into the progress bars once they enter the time range.
 - Bars update in the browser every 5 s. Event data is reloaded every 60 s.
 - Calendars are downloaded at most once per cache TTL (default 1 h). If a refresh fails, the last good copy is used.
 - The **reload** button next to ⚙ downloads all calendars immediately, bypassing the cache (useful right
@@ -117,7 +120,7 @@ If a calendar shows *"TLS certificate not trusted"*, point `--ca-bundle` (or
 ## API
 
 - `GET /api/events`: upcoming events grouped by calendar, plus the display settings
-  (`range_minutes`, `started_keep_minutes`, `warn_minutes`, `warn_color`, `alert_minutes`, `alert_color`);
+  (`range_minutes`, `later_hours`, `started_keep_minutes`, `warn_minutes`, `warn_color`, `alert_minutes`, `alert_color`);
   `?refresh=true` bypasses the cache
 - `GET /api/calendars/{id}/events`: events of a single calendar (`?refresh=true` re-downloads only that one)
 - `GET /api/config` / `PUT /api/config`: read or replace the configuration

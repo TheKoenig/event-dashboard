@@ -37,6 +37,9 @@
       <label><span data-i18n="timeRange">Time range (minutes)</span>
         <input id="range-input" type="number" min="1" max="10080" required>
       </label>
+      <label><span data-i18n="laterHours">Further events without progress bar (hours from now, 0 = off)</span>
+        <input id="later-hours-input" type="number" min="0" max="168" step="1" required>
+      </label>
       <h3 data-i18n="progressBars">Progress bars</h3>
       <label><span data-i18n="startedKeep">Keep started events (minutes)</span>
         <input id="started-keep-input" type="number" min="0" max="1440" required>
