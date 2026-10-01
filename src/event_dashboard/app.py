@@ -23,6 +23,7 @@ def _calendar_payload(
     fetcher: calendar_fetch.CalendarFetcher,
     now: datetime.datetime,
     window: datetime.timedelta,
+    force: bool = False,
 ) -> dict[str, object]:
     payload: dict[str, object] = {
         "id": cal.id,
@@ -32,7 +33,7 @@ def _calendar_payload(
         "events": [],
     }
     try:
-        data = fetcher.fetch(cal.url)
+        data = fetcher.fetch(cal.url, force=force)
         payload["events"] = [ev.to_dict() for ev in events.upcoming_events(data, now, window)]
     except (calendar_fetch.FetchError, events.ParseError) as exc:
         logger.warning("Calendar %r failed: %s", cal.name, exc)
@@ -61,24 +62,47 @@ def create_app(
 
     @app.put("/api/config")
     def put_config(new_config: config.AppConfig) -> config.AppConfig:
+        languages = config.available_languages()
+        if new_config.language not in (config.AUTO_LANGUAGE, *languages):
+            raise fastapi.HTTPException(
+                status_code=422,
+                detail=[
+                    {
+                        "loc": ["body", "language"],
+                        "msg": f"Unsupported language; choose auto or one of {languages}",
+                    }
+                ],
+            )
         return store.update(new_config)
 
+    @app.get("/api/languages")
+    def get_languages() -> list[str]:
+        return config.available_languages()
+
     @app.get("/api/events")
-    def get_events() -> dict[str, object]:
+    def get_events(refresh: bool = False) -> dict[str, object]:
         cfg = store.get()
         now = datetime.datetime.now(datetime.timezone.utc)
         window = datetime.timedelta(minutes=cfg.range_minutes)
         calendars: list[dict[str, object]] = []
+        if refresh:
+            logger.info(
+                "Manual refresh requested; re-downloading %d calendar(s)", len(cfg.calendars)
+            )
         if cfg.calendars:
             workers = min(MAX_WORKERS, len(cfg.calendars))
             with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
                 calendars = list(
-                    pool.map(lambda c: _calendar_payload(c, fetcher, now, window), cfg.calendars)
+                    pool.map(
+                        lambda c: _calendar_payload(c, fetcher, now, window, force=refresh),
+                        cfg.calendars,
+                    )
                 )
         return {
             "now": now.isoformat(),
             "title": cfg.title,
             "theme": cfg.theme,
+            "language": cfg.language,
             "range_minutes": cfg.range_minutes,
             "calendars": calendars,
         }

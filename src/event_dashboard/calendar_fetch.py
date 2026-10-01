@@ -62,13 +62,14 @@ class CalendarFetcher:
         self._cache: dict[str, _CacheEntry] = {}
         self._lock = threading.Lock()
 
-    def fetch(self, url: str) -> bytes:
+    def fetch(self, url: str, force: bool = False) -> bytes:
         """Return ICS bytes for ``url``, using the cache if still fresh.
 
         If a refresh fails but stale data is cached, the stale data is returned.
 
         Args:
             url: Calendar URL (``webcal`` URLs are accepted).
+            force: Download again even if the cached copy is still fresh.
 
         Returns:
             Raw ICS content.
@@ -80,7 +81,7 @@ class CalendarFetcher:
         now = time.monotonic()
         with self._lock:
             entry = self._cache.get(http_url)
-        if entry and now - entry.fetched_at < self.ttl:
+        if entry and not force and now - entry.fetched_at < self.ttl:
             return entry.content
         try:
             content = self._download(http_url)

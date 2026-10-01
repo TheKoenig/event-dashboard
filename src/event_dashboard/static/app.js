@@ -4,13 +4,22 @@ const TICK_MS = 5000;
 const POLL_MS = 60000;
 const DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b"];
 
-let state = { title: "Upcoming events", theme: "auto", rangeMinutes: 120, calendars: [] };
+// Must match config.DEFAULT_TITLE on the server; shown translated in the UI.
+const SERVER_DEFAULT_TITLE = "Upcoming events";
+
+let state = { title: "", theme: "auto", language: "auto", rangeMinutes: 120, calendars: [] };
+let lastUpdated = null;
 
 const $ = (sel) => document.querySelector(sel);
 
+function isDefaultTitle(title) {
+  return !title || title === SERVER_DEFAULT_TITLE;
+}
+
 function applyAppearance(title, theme) {
-  $("#page-title").textContent = title;
-  document.title = title;
+  const shown = isDefaultTitle(title) ? t("defaultTitle") : title;
+  $("#page-title").textContent = shown;
+  document.title = shown;
   document.documentElement.dataset.theme = ["light", "dark"].includes(theme) ? theme : "auto";
 }
 
@@ -25,32 +34,33 @@ function formatStart(date, allDay) {
   const opts = allDay
     ? { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric" }
     : { weekday: "short", day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" };
-  return date.toLocaleString(undefined, opts) + (allDay ? " (all day)" : "");
+  return date.toLocaleString(dateLocale(), opts) + (allDay ? ` ${t("allDay")}` : "");
 }
 
 function formatCountdown(ms) {
-  if (ms <= 0) return "starting now";
+  if (ms <= 0) return t("startingNow");
   const totalMin = Math.ceil(ms / 60000);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  return "in " + (h ? `${h}h ` : "") + `${m}m`;
+  return h ? t("inHoursMinutes", { h, m }) : t("inMinutes", { m });
 }
 
 function render() {
   const main = $("#dashboard");
   main.replaceChildren();
   applyAppearance(state.title, state.theme);
-  $("#range-label").textContent = `(next ${state.rangeMinutes} min)`;
+  updateRefreshTooltip();
+  $("#range-label").textContent = t("rangeLabel", { minutes: state.rangeMinutes });
   if (!state.calendars.length) {
-    main.append(el("p", { class: "muted" }, "No calendars configured. Click ⚙ to add one."));
+    main.append(el("p", { class: "muted" }, t("noCalendars")));
     return;
   }
   for (const cal of state.calendars) {
     const section = el("section", { class: "calendar" });
     section.style.setProperty("--cal-color", cal.color);
     section.append(el("h2", {}, cal.name));
-    if (cal.error) section.append(el("p", { class: "error" }, `Error: ${cal.error}`));
-    else if (!cal.events.length) section.append(el("p", { class: "muted" }, "No upcoming events."));
+    if (cal.error) section.append(el("p", { class: "error" }, t("error", { message: cal.error })));
+    else if (!cal.events.length) section.append(el("p", { class: "muted" }, t("noEvents")));
     for (const ev of cal.events) {
       const row = el("div", { class: "event" });
       const head = el("div", { class: "event-head" });
@@ -82,20 +92,34 @@ function tick() {
   });
 }
 
-async function loadEvents() {
+function updateRefreshTooltip() {
+  const button = $("#refresh-button");
+  let text = t("refreshTooltip");
+  if (lastUpdated) {
+    const time = lastUpdated.toLocaleTimeString(dateLocale(), { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    text += "\n" + t("lastUpdated", { time });
+  }
+  button.title = text;
+}
+
+async function loadEvents(refresh = false) {
   try {
-    const resp = await fetch("/api/events");
+    const resp = await fetch(refresh ? "/api/events?refresh=true" : "/api/events");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     state = {
       title: data.title,
       theme: data.theme,
+      language: data.language || "auto",
       rangeMinutes: data.range_minutes,
       calendars: data.calendars,
     };
+    // Don't switch the UI language under an open settings panel (it may be previewing another one).
+    if ($("#settings").hidden && (await setLanguage(state.language))) translateDocument();
+    lastUpdated = new Date();
     render();
   } catch (err) {
-    $("#dashboard").replaceChildren(el("p", { class: "error" }, `Could not load events: ${err.message}`));
+    $("#dashboard").replaceChildren(el("p", { class: "error" }, t("loadEventsFailed", { message: err.message })));
   }
 }
 
@@ -104,12 +128,37 @@ async function loadEvents() {
 function addCalendarRow(cal = {}) {
   const list = $("#calendar-list");
   const row = $("#calendar-row").content.firstElementChild.cloneNode(true);
+  translateDocument(row);
   row.dataset.id = cal.id || "";
   row.querySelector(".cal-name").value = cal.name || "";
   row.querySelector(".cal-url").value = cal.url || "";
   row.querySelector(".cal-color").value = cal.color || DEFAULT_COLORS[list.children.length % DEFAULT_COLORS.length];
   row.querySelector(".cal-remove").addEventListener("click", () => row.remove());
   list.append(row);
+}
+
+async function fillLanguageOptions(selected) {
+  const select = $("#language-input");
+  select.querySelectorAll("option:not([value='auto'])").forEach((opt) => opt.remove());
+  let languages = [];
+  try {
+    const resp = await fetch("/api/languages");
+    if (resp.ok) languages = await resp.json();
+  } catch (err) {
+    console.warn("Could not load language list:", err);
+  }
+  if (selected !== "auto" && !languages.includes(selected)) languages.push(selected);
+  for (const lang of languages) {
+    select.append(el("option", { value: lang }, languageName(lang)));
+  }
+  select.value = selected;
+}
+
+async function previewLanguage(preference) {
+  if (await setLanguage(preference)) {
+    translateDocument();
+    render();
+  }
 }
 
 async function openSettings() {
@@ -120,13 +169,14 @@ async function openSettings() {
     const resp = await fetch("/api/config");
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const cfg = await resp.json();
-    $("#title-input").value = cfg.title;
+    await fillLanguageOptions(cfg.language || "auto");
+    $("#title-input").value = isDefaultTitle(cfg.title) ? "" : cfg.title;
     $("#theme-input").value = cfg.theme;
     $("#range-input").value = cfg.range_minutes;
     $("#calendar-list").replaceChildren();
     cfg.calendars.forEach(addCalendarRow);
   } catch (err) {
-    msg.textContent = `Could not load settings: ${err.message}`;
+    msg.textContent = t("loadSettingsFailed", { message: err.message });
     msg.className = "error";
   }
   setSettingsVisible(true);
@@ -157,6 +207,7 @@ async function saveSettings(event) {
   const body = {
     title: $("#title-input").value.trim(),
     theme: $("#theme-input").value,
+    language: $("#language-input").value,
     range_minutes: parseInt($("#range-input").value, 10),
     calendars,
   };
@@ -173,23 +224,49 @@ async function saveSettings(event) {
     setSettingsVisible(false);
     await loadEvents();
   } catch (err) {
-    msg.textContent = `Save failed: ${err.message}`;
+    msg.textContent = t("saveFailed", { message: err.message });
     msg.className = "error";
   }
 }
 
+// Close the panel and undo any unsaved theme/language preview.
+async function cancelSettings() {
+  setSettingsVisible(false);
+  applyAppearance(state.title, state.theme);
+  await previewLanguage(state.language);
+}
+
+async function refreshCalendars() {
+  const button = $("#refresh-button");
+  if (button.disabled) return;
+  button.disabled = true;
+  button.classList.add("loading");
+  try {
+    await loadEvents(true);
+  } finally {
+    button.disabled = false;
+    button.classList.remove("loading");
+  }
+}
+
+$("#refresh-button").addEventListener("click", refreshCalendars);
 $("#settings-toggle").addEventListener("click", () => {
   if ($("#settings").hidden) openSettings();
-  else setSettingsVisible(false);
+  else cancelSettings();
 });
 $("#theme-input").addEventListener("change", (e) => applyAppearance(state.title, e.target.value));
-$("#cancel-settings").addEventListener("click", () => {
-  applyAppearance(state.title, state.theme);
-  setSettingsVisible(false);
-});
+$("#language-input").addEventListener("change", (e) => previewLanguage(e.target.value));
+$("#cancel-settings").addEventListener("click", cancelSettings);
 $("#add-calendar").addEventListener("click", () => addCalendarRow());
 $("#settings-form").addEventListener("submit", saveSettings);
 
-loadEvents();
-setInterval(tick, TICK_MS);
-setInterval(loadEvents, POLL_MS);
+async function init() {
+  await setLanguage("auto");
+  translateDocument();
+  applyAppearance(state.title, state.theme);
+  await loadEvents();
+  setInterval(tick, TICK_MS);
+  setInterval(loadEvents, POLL_MS);
+}
+
+init();

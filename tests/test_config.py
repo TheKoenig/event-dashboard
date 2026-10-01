@@ -90,3 +90,25 @@ def test_old_config_without_new_fields_loads(tmp_path: pathlib.Path) -> None:
 def test_invalid_theme() -> None:
     with pytest.raises(pydantic.ValidationError):
         config.AppConfig(theme="blue")
+
+
+def test_language_default_and_normalized() -> None:
+    assert config.AppConfig().language == "auto"
+    assert config.AppConfig(language=" DE ").language == "de"
+
+
+@pytest.mark.parametrize("language", ["", "german", "../x", "d"])
+def test_invalid_language_format(language: str) -> None:
+    with pytest.raises(pydantic.ValidationError):
+        config.AppConfig(language=language)
+
+
+def test_unknown_language_still_loads(tmp_path: pathlib.Path) -> None:
+    # A config that names a language whose file was removed must not stop the server.
+    path = tmp_path / "config.json"
+    path.write_text(json.dumps({"language": "fr"}))
+    assert config.ConfigStore(path).get().language == "fr"
+
+
+def test_available_languages() -> None:
+    assert {"de", "en"} <= set(config.available_languages())

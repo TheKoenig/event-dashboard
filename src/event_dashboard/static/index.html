@@ -8,48 +8,57 @@
 </head>
 <body>
   <header>
-    <h1><span id="page-title">Upcoming events</span> <small id="range-label"></small></h1>
-    <button id="settings-toggle" type="button" title="Settings" aria-expanded="false" aria-controls="settings">⚙</button>
+    <h1><span id="page-title"></span> <small id="range-label"></small></h1>
+    <div class="header-actions">
+      <button id="refresh-button" type="button" class="icon-button" title="Reload calendars now" data-i18n-title="refreshTooltip" aria-label="Reload calendars now" data-i18n-aria-label="refreshTooltip"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 12a8 8 0 1 1-2.34-5.66"/><polyline points="20 4 20 9 15 9"/></svg></button>
+      <button id="settings-toggle" type="button" class="icon-button" title="Settings" data-i18n-title="settings" aria-expanded="false" aria-controls="settings">⚙</button>
+    </div>
   </header>
 
   <section id="settings" hidden>
-    <h2>Settings</h2>
+    <h2 data-i18n="settings">Settings</h2>
     <form id="settings-form">
-      <label>Page title
-        <input id="title-input" type="text" maxlength="100" placeholder="Upcoming events">
+      <label><span data-i18n="pageTitle">Page title</span>
+        <input id="title-input" type="text" maxlength="100" placeholder="Upcoming events" data-i18n-placeholder="defaultTitle">
       </label>
-      <label>Theme
+      <label><span data-i18n="theme">Theme</span>
         <select id="theme-input">
-          <option value="auto">Auto (system)</option>
-          <option value="light">Light</option>
-          <option value="dark">Dark</option>
+          <option value="auto" data-i18n="themeAuto">Auto (system)</option>
+          <option value="light" data-i18n="themeLight">Light</option>
+          <option value="dark" data-i18n="themeDark">Dark</option>
         </select>
       </label>
-      <label>Time range (minutes)
+      <label><span data-i18n="language">Language</span>
+        <select id="language-input">
+          <option value="auto" data-i18n="languageAuto">Auto (browser)</option>
+        </select>
+      </label>
+      <label><span data-i18n="timeRange">Time range (minutes)</span>
         <input id="range-input" type="number" min="1" max="10080" required>
       </label>
-      <h3>Calendars</h3>
+      <h3 data-i18n="calendars">Calendars</h3>
       <div id="calendar-list"></div>
-      <button type="button" id="add-calendar">+ Add calendar</button>
+      <button type="button" id="add-calendar" data-i18n="addCalendar">+ Add calendar</button>
       <div class="actions">
-        <button type="submit">Save</button>
-        <button type="button" id="cancel-settings">Cancel</button>
+        <button type="submit" data-i18n="save">Save</button>
+        <button type="button" id="cancel-settings" data-i18n="cancel">Cancel</button>
       </div>
       <p id="settings-message" role="status"></p>
     </form>
   </section>
 
-  <main id="dashboard"><p class="muted">Loading…</p></main>
+  <main id="dashboard"><p class="muted" data-i18n="loading">Loading…</p></main>
 
   <template id="calendar-row">
     <div class="calendar-row">
-      <input class="cal-name" placeholder="Name" required maxlength="100">
-      <input class="cal-url" placeholder="webcal://… or https://….ics" required>
+      <input class="cal-name" placeholder="Name" data-i18n-placeholder="name" required maxlength="100">
+      <input class="cal-url" placeholder="webcal://… or https://….ics" data-i18n-placeholder="urlPlaceholder" required>
       <input class="cal-color" type="color">
-      <button type="button" class="cal-remove" title="Remove">✕</button>
+      <button type="button" class="cal-remove" title="Remove" data-i18n-title="remove">✕</button>
     </div>
   </template>
 
+  <script src="/static/i18n.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

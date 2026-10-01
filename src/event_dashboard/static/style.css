@@ -41,7 +41,15 @@ input, select, button { background: var(--input-bg); color: var(--text); border:
 header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 header h1 { margin: 0; font-size: 1.4rem; }
 header small { color: var(--muted); font-weight: normal; font-size: .9rem; }
-#settings-toggle { font-size: 1.5rem; background: none; border: none; cursor: pointer; color: var(--text); }
+.header-actions { display: flex; align-items: center; gap: 1rem; }
+.icon-button { appearance: none; font-size: 1.5rem; line-height: 1; padding: .25rem; background: none; border: none; box-shadow: none; cursor: pointer; color: var(--text); }
+.icon-button:hover:not(:disabled) { color: var(--muted); }
+.icon-button .icon { display: block; width: .8em; height: .8em; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
+.icon-button:focus { outline: none; }
+.icon-button:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; border-radius: 4px; }
+.icon-button:disabled { cursor: progress; opacity: .6; }
+#refresh-button.loading { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 main, #settings { max-width: 960px; margin: 1.5rem auto; padding: 0 1rem; }
 #settings { background: var(--card); padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
 .calendar-row { display: grid; grid-template-columns: 1fr 2fr auto auto; gap: .5rem; margin-bottom: .5rem; }

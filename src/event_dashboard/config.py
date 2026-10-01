@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib.resources
 import json
 import logging
 import os
@@ -20,7 +21,23 @@ MAX_RANGE_MINUTES = 7 * 24 * 60
 ALLOWED_SCHEMES = ("http://", "https://", "webcal://", "webcals://")
 DEFAULT_COLORS = ("#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "#8c564b")
 DEFAULT_TITLE = "Upcoming events"
+AUTO_LANGUAGE = "auto"
 Theme = typing.Literal["auto", "light", "dark"]
+_LANGUAGE_PATTERN = r"^(auto|[a-z]{2,3}(-[a-z0-9]{2,8})?)$"
+
+
+def available_languages() -> list[str]:
+    """Return the language codes that have a translation file, sorted.
+
+    Returns:
+        Language codes such as ``["de", "en"]``.
+    """
+    locales = importlib.resources.files("event_dashboard") / "static" / "locales"
+    return sorted(
+        entry.name.removesuffix(".json")
+        for entry in locales.iterdir()
+        if entry.name.endswith(".json")
+    )
 
 
 class CalendarConfig(pydantic.BaseModel):
@@ -66,12 +83,14 @@ class AppConfig(pydantic.BaseModel):
     Attributes:
         title: Page title shown in the header and browser tab.
         theme: Color theme; ``auto`` follows the operating system preference.
+        language: UI language code; ``auto`` uses the browser language.
         range_minutes: Look-ahead window for upcoming events in minutes.
         calendars: List of subscribed calendars.
     """
 
     title: str = pydantic.Field(default=DEFAULT_TITLE, max_length=100)
     theme: Theme = "auto"
+    language: str = pydantic.Field(default=AUTO_LANGUAGE, pattern=_LANGUAGE_PATTERN)
     range_minutes: int = pydantic.Field(default=DEFAULT_RANGE_MINUTES, ge=1, le=MAX_RANGE_MINUTES)
     calendars: list[CalendarConfig] = pydantic.Field(default_factory=list)
 
@@ -79,6 +98,11 @@ class AppConfig(pydantic.BaseModel):
     @classmethod
     def _default_title(cls, value: str) -> str:
         return value.strip() or DEFAULT_TITLE
+
+    @pydantic.field_validator("language", mode="before")
+    @classmethod
+    def _normalize_language(cls, value: object) -> object:
+        return value.strip().lower() if isinstance(value, str) else value
 
     @pydantic.model_validator(mode="after")
     def _unique_ids(self) -> AppConfig:

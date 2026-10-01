@@ -16,6 +16,7 @@ Open <http://127.0.0.1:8000>, then click **⚙** to open the settings panel, whe
 
 - set the page title (shown in the header and browser tab)
 - pick a theme: **Auto** (follows the OS light/dark setting), **Light** or **Dark**
+- pick a language: **Auto (browser)** (default) or a specific language
 - set the time range in minutes (1–10080)
 - add or remove calendars (name, ICS/webcal URL, color)
 
@@ -27,8 +28,23 @@ Settings are stored server-side in a JSON file (default `config.json`), so all v
 - A bar fills from 0 % (the event starts at the far end of the range) to 100 % (the event starts now).
 - Bars update in the browser every 5 s. Event data is reloaded every 60 s.
 - Calendars are downloaded at most once per cache TTL (default 5 min). If a refresh fails, the last good copy is used.
+- The **reload** button next to ⚙ downloads all calendars immediately, bypassing the cache (useful right
+  after adding an event). Its hover text shows when the data was last updated.
 - Repeating events (RRULE/EXDATE), time zones, all-day and floating events, and cancelled events are all handled.
 - If a calendar fails to load or parse, the error is shown in that calendar's section.
+
+## Language
+
+By default the page uses the browser's language. A fixed language can be selected in the settings;
+it applies to all viewers. Translations live in `src/event_dashboard/static/locales/<lang>.json`
+(currently `en` and `de`), and the language list in the settings is built from these files. If no
+translation matches, the page falls back to English. Dates and times follow the browser locale on
+**Auto**, and the selected language otherwise.
+
+To add a language, copy `en.json` to e.g. `fr.json` and translate the values. Keep the keys and the
+`{placeholders}` unchanged; `tests/test_locales.py` checks this.
+
+Error messages from the server (validation and fetch errors) stay in English.
 
 ## CLI options
 
@@ -50,8 +66,9 @@ uv run event-dashboard serve --help
 
 ## API
 
-- `GET /api/events`: upcoming events grouped by calendar
+- `GET /api/events`: upcoming events grouped by calendar (`?refresh=true` bypasses the cache)
 - `GET /api/config` / `PUT /api/config`: read or replace the configuration
+- `GET /api/languages`: available UI translations
 
 ## Development
 

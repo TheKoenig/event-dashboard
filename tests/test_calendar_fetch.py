@@ -66,3 +66,20 @@ def test_too_large(monkeypatch: pytest.MonkeyPatch) -> None:
     respx.get("https://example.com/a.ics").mock(return_value=httpx.Response(200, content=b"1234"))
     with pytest.raises(calendar_fetch.FetchError, match="too large"):
         calendar_fetch.CalendarFetcher().fetch("https://example.com/a.ics")
+
+
+@respx.mock
+def test_force_bypasses_fresh_cache() -> None:
+    route = respx.get("https://example.com/a.ics")
+    route.side_effect = [
+        httpx.Response(200, content=b"OLD"),
+        httpx.Response(200, content=b"NEW"),
+        httpx.Response(500),
+    ]
+    fetcher = calendar_fetch.CalendarFetcher(ttl=300)
+    assert fetcher.fetch("https://example.com/a.ics") == b"OLD"
+    assert fetcher.fetch("https://example.com/a.ics", force=True) == b"NEW"
+    assert fetcher.fetch("https://example.com/a.ics") == b"NEW"
+    # A failed forced refresh keeps serving the last good copy.
+    assert fetcher.fetch("https://example.com/a.ics", force=True) == b"NEW"
+    assert route.call_count == 3
