@@ -27,7 +27,7 @@ Settings are stored server-side in a JSON file (default `config.json`), so all v
 - Each bar shows the event title and start date/time, plus a countdown.
 - A bar fills from 0 % (the event starts at the far end of the range) to 100 % (the event starts now).
 - Bars update in the browser every 5 s. Event data is reloaded every 60 s.
-- Calendars are downloaded at most once per cache TTL (default 5 min). If a refresh fails, the last good copy is used.
+- Calendars are downloaded at most once per cache TTL (default 1 h). If a refresh fails, the last good copy is used.
 - The **reload** button next to ⚙ downloads all calendars immediately, bypassing the cache (useful right
   after adding an event). Its hover text shows when the data was last updated.
 - Repeating events (RRULE/EXDATE), time zones, all-day and floating events, and cancelled events are all handled.
@@ -57,8 +57,8 @@ uv run event-dashboard serve --help
 | `--host`          | `EVENT_DASHBOARD_HOST`           | `127.0.0.1`   |
 | `--port`          | `EVENT_DASHBOARD_PORT`           | `8000`        |
 | `--config`        | `EVENT_DASHBOARD_CONFIG`         | `config.json` |
-| `--fetch-timeout` | `EVENT_DASHBOARD_FETCH_TIMEOUT`  | `15` s        |
-| `--cache-ttl`     | `EVENT_DASHBOARD_CACHE_TTL`      | `300` s       |
+| `--fetch-timeout` | `EVENT_DASHBOARD_FETCH_TIMEOUT`  | `15` s (min 3 s) |
+| `--cache-ttl`     | `EVENT_DASHBOARD_CACHE_TTL`      | `3600` s (1 h, min 120 s) |
 | `--ca-bundle`     | `EVENT_DASHBOARD_CA_BUNDLE`      | none          |
 | `--log-level`     | `EVENT_DASHBOARD_LOG_LEVEL`      | `INFO`        |
 

@@ -37,16 +37,16 @@ def cli() -> None:
 @click.option(
     "--fetch-timeout",
     envvar="EVENT_DASHBOARD_FETCH_TIMEOUT",
-    default=15.0,
-    type=click.FloatRange(min=1),
+    default=15,
+    type=click.IntRange(min=calendar_fetch.MIN_FETCH_TIMEOUT),
     show_default=True,
     help="HTTP timeout in seconds for calendar downloads.",
 )
 @click.option(
     "--cache-ttl",
     envvar="EVENT_DASHBOARD_CACHE_TTL",
-    default=300.0,
-    type=click.FloatRange(min=0),
+    default=3600,
+    type=click.IntRange(min=calendar_fetch.MIN_CACHE_TTL),
     show_default=True,
     help="Seconds to cache downloaded calendars.",
 )
@@ -68,8 +68,8 @@ def serve(
     host: str,
     port: int,
     config_path: str,
-    fetch_timeout: float,
-    cache_ttl: float,
+    fetch_timeout: int,
+    cache_ttl: int,
     ca_bundle: str | None,
     log_level: str,
 ) -> None:

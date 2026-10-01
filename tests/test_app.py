@@ -25,7 +25,7 @@ def _ics_starting_in(minutes: int) -> bytes:
 @pytest.fixture
 def client(tmp_path: pathlib.Path) -> fastapi.testclient.TestClient:
     store = config.ConfigStore(tmp_path / "config.json")
-    fetcher = calendar_fetch.CalendarFetcher(ttl=0)
+    fetcher = calendar_fetch.CalendarFetcher()
     return fastapi.testclient.TestClient(app_module.create_app(store, fetcher))
 
 

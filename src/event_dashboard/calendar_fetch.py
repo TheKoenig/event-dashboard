@@ -16,6 +16,9 @@ import httpx
 logger = logging.getLogger(__name__)
 
 MAX_ICS_BYTES = 20 * 1024 * 1024
+# Lower bounds that keep the dashboard from hammering calendar servers or giving up too early.
+MIN_CACHE_TTL = 120
+MIN_FETCH_TIMEOUT = 3
 
 # Well-known OS certificate bundles. Corporate TLS-inspection CAs are usually installed here,
 # but Python distributions such as conda/miniforge ship their own bundle and ignore these files.
@@ -121,19 +124,26 @@ class CalendarFetcher:
     """Fetches ICS data over HTTP with a time-based cache.
 
     Args:
-        timeout: Request timeout in seconds.
-        ttl: Cache time-to-live in seconds.
+        timeout: Request timeout in seconds (at least ``MIN_FETCH_TIMEOUT``).
+        ttl: Cache time-to-live in seconds (at least ``MIN_CACHE_TTL``).
         client: Optional preconfigured ``httpx.Client`` (useful for tests).
         ca_bundle: Optional extra CA file or directory to trust (see ``build_ssl_context``).
+
+    Raises:
+        ValueError: If ``timeout`` or ``ttl`` is below its minimum.
     """
 
     def __init__(
         self,
-        timeout: float = 15.0,
-        ttl: float = 300.0,
+        timeout: int = 15,
+        ttl: int = 3600,
         client: httpx.Client | None = None,
         ca_bundle: str | os.PathLike[str] | None = None,
     ) -> None:
+        if ttl < MIN_CACHE_TTL:
+            raise ValueError(f"Cache TTL must be at least {MIN_CACHE_TTL} seconds")
+        if timeout < MIN_FETCH_TIMEOUT:
+            raise ValueError(f"Fetch timeout must be at least {MIN_FETCH_TIMEOUT} seconds")
         self.ttl = ttl
         self._client = client or httpx.Client(
             timeout=timeout,

@@ -56,12 +56,34 @@ def test_fetch_network_error() -> None:
 
 
 @respx.mock
-def test_stale_cache_served_on_failure() -> None:
+def test_cache_expires_and_stale_copy_served_on_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    clock = [1000.0]
+    monkeypatch.setattr(calendar_fetch.time, "monotonic", lambda: clock[0])
     route = respx.get("https://example.com/a.ics")
-    route.side_effect = [httpx.Response(200, content=b"OLD"), httpx.Response(500)]
-    fetcher = calendar_fetch.CalendarFetcher(ttl=0)
+    route.side_effect = [
+        httpx.Response(200, content=b"OLD"),
+        httpx.Response(200, content=b"NEW"),
+        httpx.Response(500),
+    ]
+    fetcher = calendar_fetch.CalendarFetcher(ttl=120)
     assert fetcher.fetch("https://example.com/a.ics") == b"OLD"
+    clock[0] += 119
     assert fetcher.fetch("https://example.com/a.ics") == b"OLD"
+    assert route.call_count == 1
+    clock[0] += 1
+    assert fetcher.fetch("https://example.com/a.ics") == b"NEW"
+    clock[0] += 120
+    assert fetcher.fetch("https://example.com/a.ics") == b"NEW"
+    assert route.call_count == 3
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [({"ttl": 119}, "Cache TTL"), ({"timeout": 2}, "Fetch timeout")],
+)
+def test_minimums_enforced(kwargs: dict, message: str) -> None:
+    with pytest.raises(ValueError, match=message):
+        calendar_fetch.CalendarFetcher(**kwargs)
 
 
 @respx.mock
