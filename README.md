@@ -22,9 +22,11 @@ Open <http://127.0.0.1> (or <https://127.0.0.1> with TLS), then click **⚙** to
   range but within this window are listed below the bars, without a bar, under a "Later" heading
 - set the progress bar behavior: how long started events stay visible (default 5 min), and the
   warning (default 15 min, orange) and alert (default 3 min, red) thresholds and colors (0 = off)
+- independently enable a sound for the warning and alert phases (both off by default);
+  these preferences are saved in each browser's local storage, not in the shared `config.json`
 - add or remove calendars (name, ICS/webcal URL, color)
 
-Settings are stored server-side in a JSON file (default `config.json`), so all viewers share them.
+Other settings are stored server-side in a JSON file (default `config.json`), so all viewers share them.
 
 ## How it works
 
@@ -32,6 +34,12 @@ Settings are stored server-side in a JSON file (default `config.json`), so all v
 - A bar fills from 0 % (the event starts at the far end of the range) to 100 % (the event starts now).
 - Within the warning time before the start, the bar uses the warning color. Within the alert time it uses
   the alert color and slowly fades in and out (4 s period, off when the OS "reduce motion" setting is on).
+- With the respective sound enabled, the browser plays two tones when an event enters the warning phase,
+  and plays five tones when an event enters the alarm phase. The initial page load does not sound for events
+  already in a phase; refreshes do not replay either tone. Browser autoplay rules may require a click on the
+  page before audio works; blocked audio is reported on the page. A phase's threshold must be greater than 0
+  for its sound to play. Sound preferences are per browser and per origin (scheme, host and port),
+  and each browser must permit audio independently.
 - Once an event has started, its bar stays full and light grey with "started X min ago" for the
   configured time (default 5 min), then disappears.
 - Events in the "Later" list move up into the progress bars once they enter the time range.

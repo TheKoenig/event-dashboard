@@ -1,6 +1,6 @@
 [project]
 name = "event-dashboard"
-version = "0.1.0"
+version = "0.2.0"
 description = "Web dashboard showing countdown progress bars for upcoming events from subscribed ICS/webcal calendars."
 readme = "README.md"
 license = "MIT"

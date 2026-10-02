@@ -40,7 +40,7 @@
 body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); }
 input, select, button { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
 #settings label { display: block; margin-bottom: .75rem; }
-#settings label input:not([type="color"]), #settings label select { display: block; margin-top: .25rem; padding: .4rem; min-width: 16rem; }
+#settings label input:not([type="color"]):not([type="checkbox"]), #settings label select { display: block; margin-top: .25rem; padding: .4rem; min-width: 16rem; }
 header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.5rem; background: var(--card); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 header h1 { margin: 0; font-size: 1.4rem; }
 header small { color: var(--muted); font-weight: normal; font-size: .9rem; }
@@ -82,6 +82,9 @@ button { padding: .4rem .9rem; cursor: pointer; }
 .threshold-row { display: flex; gap: 1rem; align-items: flex-end; }
 .threshold-row .color-label span { display: block; }
 .color-label input[type="color"] { display: block; margin-top: .25rem; width: 3rem; height: 2.1rem; padding: 0; }
+.sound-setting input { margin-right: .4rem; }
+.sound-setting + .muted { margin-top: 0; }
+#sound-status { max-width: 960px; margin: .5rem auto; padding: 0 1rem; }
 .muted { color: var(--muted); }
 .error { color: var(--error); }
 #settings-message.error { color: var(--error); }

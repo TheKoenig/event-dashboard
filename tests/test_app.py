@@ -108,6 +108,8 @@ def test_events_empty(client: fastapi.testclient.TestClient) -> None:
     assert data["language"] == "auto"
     assert data["started_keep_minutes"] == 5
     assert data["later_hours"] == 0
+    assert "alert_sound_enabled" not in data
+    assert "warn_sound_enabled" not in data
     assert (data["warn_minutes"], data["warn_color"]) == (15, "#ff8c00")
     assert (data["alert_minutes"], data["alert_color"]) == (3, "#e53935")
 
@@ -249,6 +251,8 @@ def test_started_events_kept(
     single = client.get(f"/api/calendars/{cal_id}/events").json()
     assert [ev["title"] for ev in single["calendar"]["events"]] == expected
     assert single["started_keep_minutes"] == keep
+    assert "alert_sound_enabled" not in single
+    assert "warn_sound_enabled" not in single
 
 
 @pytest.mark.parametrize(("later_hours", "expected"), [(0, []), (4, ["Soon"]), (2, [])])

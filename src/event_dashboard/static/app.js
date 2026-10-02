@@ -6,6 +6,17 @@ const DEFAULT_COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", "
 
 // Must match config.DEFAULT_TITLE on the server; shown translated in the UI.
 const SERVER_DEFAULT_TITLE = "Upcoming events";
+const SOUND_SETTINGS_KEY = "event-dashboard.sound-settings";
+
+function readSoundSettings() {
+  const stored = localStorage.getItem(SOUND_SETTINGS_KEY);
+  if (stored === null) return { warnSoundEnabled: false, alertSoundEnabled: false };
+  const settings = JSON.parse(stored);
+  if (typeof settings?.warnSoundEnabled !== "boolean" || typeof settings?.alertSoundEnabled !== "boolean") {
+    throw new Error("Invalid saved sound settings");
+  }
+  return settings;
+}
 
 let state = {
   title: "",
@@ -16,13 +27,81 @@ let state = {
   startedKeepMinutes: 5,
   warnMinutes: 15,
   warnColor: "#ff8c00",
+  warnSoundEnabled: false,
   alertMinutes: 3,
   alertColor: "#e53935",
+  alertSoundEnabled: false,
   calendars: [],
 };
 let lastUpdated = null;
+let audioContext = null;
+let initialRenderDone = false;
+let soundStorageError = false;
+const seenPhases = new Map();
 
 const $ = (sel) => document.querySelector(sel);
+
+function soundStatus(key, params = {}) {
+  const status = $("#sound-status");
+  status.hidden = !key;
+  status.textContent = key ? t(key, params) : "";
+}
+
+function unlockAudio() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) {
+    soundStatus("soundUnsupported");
+    return;
+  }
+  try {
+    if (!audioContext) audioContext = new AudioContextClass();
+    if (audioContext.state === "running") {
+      soundStatus(null);
+      return;
+    }
+    audioContext.resume().then(() => {
+      soundStatus(audioContext.state === "running" ? null : "soundBlocked");
+    }).catch((err) => {
+      console.error("Could not enable event sound:", err);
+      soundStatus("soundFailed", { message: err.message });
+    });
+  } catch (err) {
+    console.error("Could not enable event sound:", err);
+    soundStatus("soundFailed", { message: err.message });
+  }
+}
+
+function playPhaseSound(phase) {
+  if (!audioContext || audioContext.state !== "running") {
+    soundStatus(window.AudioContext || window.webkitAudioContext ? "soundBlocked" : "soundUnsupported");
+    return;
+  }
+  try {
+    const tones = phase === "warn"
+      ? [[440, 0.4], [330, 0.4]]
+      : [[440, 0.4], [440, 0.4], [330, 0.2], [330, 0.2], [330, 0.2]];
+    const gap = phase === "alert" ? 0.1 : 0;
+    let start = audioContext.currentTime;
+    for (const [frequency, duration] of tones) {
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.type = "sine";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.16, start + 0.02);
+      gain.gain.setValueAtTime(0.16, start + duration - 0.03);
+      gain.gain.linearRampToValueAtTime(0, start + duration);
+      oscillator.connect(gain);
+      gain.connect(audioContext.destination);
+      oscillator.start(start);
+      oscillator.stop(start + duration);
+      start += duration + gap;
+    }
+  } catch (err) {
+    console.error("Could not play event sound:", err);
+    soundStatus("soundFailed", { message: err.message });
+  }
+}
 
 function isDefaultTitle(title) {
   return !title || title === SERVER_DEFAULT_TITLE;
@@ -116,7 +195,10 @@ function renderCalendar(cal) {
     const fill = el("div", { class: "bar-fill" });
     bar.append(fill);
     row.append(head, bar);
-    row._ev = { start: new Date(ev.start), allDay: ev.all_day, time, fill, bar };
+    row._ev = {
+      start: new Date(ev.start), allDay: ev.all_day, time, fill, bar,
+      key: JSON.stringify([cal.id, ev.start, ev.end, ev.title]),
+    };
     section.append(row);
   }
   return section;
@@ -160,6 +242,10 @@ function tick() {
   const now = Date.now();
   const windowMs = state.rangeMinutes * 60000;
   const keepMs = state.startedKeepMinutes * 60000;
+  const newSounds = new Set();
+  for (const [key, entry] of seenPhases) {
+    if (entry.start + keepMs < now) seenPhases.delete(key);
+  }
   document.querySelectorAll(".event").forEach((row) => {
     const ev = row._ev;
     const remaining = ev.start.getTime() - now;
@@ -170,7 +256,20 @@ function tick() {
     ev.bar.hidden = later;
     // Started events stay as a full grey bar until the keep time is over.
     row.hidden = started && -remaining >= keepMs;
-    const phase = started ? "started" : phaseFor(remaining);
+    const phase = started ? "started" : later ? "normal" : phaseFor(remaining);
+    if (phase === "warn" || phase === "alert") {
+      let entry = seenPhases.get(ev.key);
+      if (!entry) {
+        entry = { start: ev.start.getTime(), phases: new Set() };
+        seenPhases.set(ev.key, entry);
+      }
+      if (!entry.phases.has(phase)) {
+        entry.phases.add(phase);
+        if (initialRenderDone && (phase === "warn" ? state.warnSoundEnabled : state.alertSoundEnabled)) {
+          newSounds.add(phase);
+        }
+      }
+    }
     row.classList.toggle("started", phase === "started");
     row.classList.toggle("warn", phase === "warn");
     row.classList.toggle("alert", phase === "alert");
@@ -183,6 +282,8 @@ function tick() {
     const status = started ? formatStarted(-remaining) : formatCountdown(remaining);
     ev.time.textContent = `${formatStart(ev.start, ev.allDay)} · ${status}`;
   });
+  for (const phase of newSounds) playPhaseSound(phase);
+  initialRenderDone = true;
   document.querySelectorAll("#dashboard .calendar").forEach((section) => {
     const placeholder = section.querySelector(".no-events");
     if (placeholder) placeholder.hidden = !!section.querySelector(".event:not([hidden])");
@@ -223,6 +324,8 @@ async function loadEvents(refresh = false) {
     const data = await resp.json();
     const updated = new Date();
     state = {
+      warnSoundEnabled: state.warnSoundEnabled,
+      alertSoundEnabled: state.alertSoundEnabled,
       title: data.title,
       theme: data.theme,
       language: data.language || "auto",
@@ -230,6 +333,7 @@ async function loadEvents(refresh = false) {
       ...displaySettings(data),
       calendars: data.calendars.map((cal) => ({ ...cal, updated })),
     };
+    if (!soundStorageError && !state.warnSoundEnabled && !state.alertSoundEnabled) soundStatus(null);
     // Don't switch the UI language under an open settings panel (it may be previewing another one).
     if ($("#settings").hidden && (await setLanguage(state.language))) translateDocument();
     lastUpdated = updated;
@@ -293,8 +397,10 @@ async function openSettings() {
     $("#started-keep-input").value = cfg.started_keep_minutes;
     $("#warn-minutes-input").value = cfg.warn_minutes;
     $("#warn-color-input").value = cfg.warn_color;
+    $("#warn-sound-enabled-input").checked = state.warnSoundEnabled;
     $("#alert-minutes-input").value = cfg.alert_minutes;
     $("#alert-color-input").value = cfg.alert_color;
+    $("#alert-sound-enabled-input").checked = state.alertSoundEnabled;
     $("#calendar-list").replaceChildren();
     cfg.calendars.forEach(addCalendarRow);
   } catch (err) {
@@ -321,6 +427,8 @@ function formatValidationError(detail) {
 
 async function saveSettings(event) {
   event.preventDefault();
+  if ($("#warn-sound-enabled-input").checked || $("#alert-sound-enabled-input").checked) unlockAudio();
+  else soundStatus(null);
   const msg = $("#settings-message");
   const calendars = [...document.querySelectorAll("#calendar-list .calendar-row")].map((row) => {
     const cal = {
@@ -354,6 +462,15 @@ async function saveSettings(event) {
       const data = await resp.json().catch(() => ({}));
       throw new Error(formatValidationError(data.detail || `HTTP ${resp.status}`));
     }
+    const soundSettings = {
+      warnSoundEnabled: $("#warn-sound-enabled-input").checked,
+      alertSoundEnabled: $("#alert-sound-enabled-input").checked,
+    };
+    localStorage.setItem(SOUND_SETTINGS_KEY, JSON.stringify(soundSettings));
+    Object.assign(state, soundSettings);
+    if (soundStorageError) soundStatus(null);
+    soundStorageError = false;
+    if (!state.warnSoundEnabled && !state.alertSoundEnabled) soundStatus(null);
     setSettingsVisible(false);
     await loadEvents();
   } catch (err) {
@@ -384,8 +501,18 @@ async function refreshCalendars() {
 
 $("#refresh-button").addEventListener("click", refreshCalendars);
 $("#settings-toggle").addEventListener("click", () => {
+  if (state.warnSoundEnabled || state.alertSoundEnabled) unlockAudio();
   if ($("#settings").hidden) openSettings();
   else cancelSettings();
+});
+for (const id of ["#warn-sound-enabled-input", "#alert-sound-enabled-input"]) {
+  $(id).addEventListener("change", (event) => {
+    if (event.target.checked) unlockAudio();
+    else if (!$("#warn-sound-enabled-input").checked && !$("#alert-sound-enabled-input").checked) soundStatus(null);
+  });
+}
+document.addEventListener("click", () => {
+  if ((state.warnSoundEnabled || state.alertSoundEnabled) && audioContext?.state !== "running") unlockAudio();
 });
 $("#theme-input").addEventListener("change", (e) => applyAppearance(state.title, e.target.value));
 $("#language-input").addEventListener("change", (e) => previewLanguage(e.target.value));
@@ -396,6 +523,13 @@ $("#settings-form").addEventListener("submit", saveSettings);
 async function init() {
   await setLanguage("auto");
   translateDocument();
+  try {
+    Object.assign(state, readSoundSettings());
+  } catch (err) {
+    console.error("Could not load browser sound settings:", err);
+    soundStorageError = true;
+    soundStatus("soundStorageFailed", { message: err.message });
+  }
   applyAppearance(state.title, state.theme);
   await loadEvents();
   setInterval(tick, TICK_MS);

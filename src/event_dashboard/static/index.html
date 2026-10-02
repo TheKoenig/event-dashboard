@@ -15,6 +15,7 @@
       <button id="settings-toggle" type="button" class="icon-button" title="Settings" data-i18n-title="settings" aria-expanded="false" aria-controls="settings">⚙</button>
     </div>
   </header>
+  <p id="sound-status" class="error" role="status" hidden></p>
 
   <section id="settings" hidden>
     <h2 data-i18n="settings">Settings</h2>
@@ -52,6 +53,9 @@
           <input id="warn-color-input" type="color">
         </label>
       </div>
+      <label class="sound-setting"><input id="warn-sound-enabled-input" type="checkbox">
+        <span data-i18n="warnSoundEnabled">Play a sound when an event enters the warning phase</span>
+      </label>
       <div class="threshold-row">
         <label><span data-i18n="alertMinutes">Alert before start, blinking (minutes, 0 = off)</span>
           <input id="alert-minutes-input" type="number" min="0" max="10080" required>
@@ -60,6 +64,10 @@
           <input id="alert-color-input" type="color">
         </label>
       </div>
+      <label class="sound-setting"><input id="alert-sound-enabled-input" type="checkbox">
+        <span data-i18n="alertSoundEnabled">Play a sound when an event enters the alert phase</span>
+      </label>
+      <p class="muted" data-i18n="soundHint">Your browser may require a click on this page before it can play sound.</p>
       <h3 data-i18n="calendars">Calendars</h3>
       <div id="calendar-list"></div>
       <button type="button" id="add-calendar" data-i18n="addCalendar">+ Add calendar</button>
